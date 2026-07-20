@@ -1,0 +1,51 @@
+---
+title: Catalog
+layout: base.njk
+---
+<h1>Our Products</h1>
+
+<div id="catalog">Loading products...</div>
+
+<style>
+  #catalog { display: flex; flex-wrap: wrap; gap: 16px; }
+  .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; width: 220px; }
+  .card img { width: 100%; border-radius: 6px; }
+  .card h3 { font-size: 16px; margin: 8px 0 4px; }
+  .card select { width: 100%; margin-top: 6px; }
+</style>
+
+<script>
+  async function loadCatalog() {
+    const el = document.getElementById("catalog");
+    try {
+      const res = await fetch("/api/products");
+      const products = await res.json();
+
+      if (!Array.isArray(products) || products.length === 0) {
+        el.innerHTML = "<p>No products yet.</p>";
+        return;
+      }
+
+      el.innerHTML = products.map(p => {
+        const sizeOptions = Object.entries(p.sizes)
+          .map(([size, price]) => `<option value="${size}">${size} - ₹${price}</option>`)
+          .join("");
+
+        return `
+          <div class="card">
+            <img src="${p.photo}" alt="${p.name}">
+            <h3>${p.name}</h3>
+            <select>${sizeOptions}</select>
+            <button onclick="alert('Add to cart coming in the next step')">Add to cart</button>
+          </div>
+        `;
+      }).join("");
+
+    } catch (err) {
+      el.innerHTML = "<p>Could not load products. Check console.</p>";
+      console.error(err);
+    }
+  }
+
+  loadCatalog();
+</script>

@@ -1,0 +1,19 @@
+{
+  "name": "smsm",
+  "version": "1.0.0",
+  "description": "SMSM - free-stack ecommerce SaaS (11ty + Cloudflare Pages + D1)",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx @11ty/eleventy",
+    "dev": "npx @11ty/eleventy --serve",
+    "pages:dev": "npm run build && npx wrangler pages dev _site"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@11ty/eleventy": "^3.0.0",
+    "wrangler": "^4.112.0"
+  }
+}

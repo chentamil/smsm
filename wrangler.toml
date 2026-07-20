@@ -1,0 +1,8 @@
+name = "smsm"
+compatibility_date = "2026-07-01"
+pages_build_output_dir = "_site"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "smsm-db"
+database_id = "0f145c48-e95c-45df-9f13-ed81f12cf031"
