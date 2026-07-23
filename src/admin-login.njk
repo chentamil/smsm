@@ -1,14 +1,21 @@
 ---
 title: Admin Login
-layout: base.njk
+layout: admin-base.njk
 ---
-<h1>Admin Login</h1>
-
-<form id="login-form">
-  <input type="password" id="password" placeholder="Password" required>
-  <button type="submit">Login</button>
-</form>
-<p id="login-result"></p>
+<div style="max-width: 360px; margin: var(--space-6) auto 0;">
+  <div class="surface-card text-center">
+    <div style="font-size: 30px; margin-bottom: var(--space-2);">🔐</div>
+    <h2>Admin Login</h2>
+    <form id="login-form" class="stack-md" style="text-align:left;">
+      <div class="form-field">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" class="form-control" id="password" required autofocus>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Login</button>
+    </form>
+    <div id="login-result" style="margin-top: var(--space-3);"></div>
+  </div>
+</div>
 
 <script>
   document.getElementById("login-form").addEventListener("submit", async (e) => {
@@ -26,7 +33,7 @@ layout: base.njk
     if (data.success) {
       window.location.href = "/admin/";
     } else {
-      resultEl.textContent = data.error || "Login failed";
+      resultEl.innerHTML = `<div class="alert alert-danger">${data.error || "Login failed"}</div>`;
     }
   });
 </script>

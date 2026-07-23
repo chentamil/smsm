@@ -3,34 +3,61 @@ title: Cart & Checkout
 layout: base.njk
 ---
 <h1>Your Cart</h1>
-<p><a href="/catalog/">← Back to catalog</a></p>
 
-<div id="cart-items"></div>
-<h3>Total: ₹<span id="cart-total">0</span></h3>
+<div id="cart-items" class="stack-md" style="margin-bottom: var(--space-4);"></div>
+<div class="surface-card" style="display:flex; justify-content:space-between; align-items:center;">
+  <span style="font-weight:600;">Total</span>
+  <span style="font-family:var(--font-display); font-weight:700; font-size:18px;">₹<span id="cart-total">0</span></span>
+</div>
 
-<h2>Checkout</h2>
-<form id="checkout-form">
-  <div><label>Name: <input type="text" id="c-name" required></label></div>
-  <div><label>Email: <input type="email" id="c-email" required></label></div>
-  <div><label>Address: <input type="text" id="c-address" required></label></div>
-  <div><label>City: <input type="text" id="c-city" required></label></div>
-  <div><label>State: <input type="text" id="c-state" required></label></div>
+<h2 style="margin-top: var(--space-5);">Delivery Details</h2>
+<form id="checkout-form" class="surface-card">
+  <div class="form-field">
+    <label class="form-label" for="c-name">Full name</label>
+    <input type="text" class="form-control" id="c-name" required>
+  </div>
+  <div class="form-field">
+    <label class="form-label" for="c-email">Email</label>
+    <input type="email" class="form-control" id="c-email" required>
+  </div>
+  <div class="form-field">
+    <label class="form-label" for="c-address">Address</label>
+    <input type="text" class="form-control" id="c-address" required>
+  </div>
+  <div class="row g-2">
+    <div class="col-6 form-field">
+      <label class="form-label" for="c-city">City</label>
+      <input type="text" class="form-control" id="c-city" required>
+    </div>
+    <div class="col-6 form-field">
+      <label class="form-label" for="c-state">State</label>
+      <input type="text" class="form-control" id="c-state" required>
+    </div>
+  </div>
 
   <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
-  <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1"></div>
+  <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1" style="margin: var(--space-3) 0;"></div>
 
-  <button type="submit">Place Order (Cash on Delivery)</button>
+  <button type="submit" class="btn btn-primary btn-block">Place Order (Cash on Delivery)</button>
 </form>
 
-<div id="order-result"></div>
+<div id="order-result" style="margin-top: var(--space-3);"></div>
 
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
 <style>
-  #cart-items { margin-bottom: 16px; }
-  .cart-row { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 6px 0; }
-  form div { margin-bottom: 8px; }
-  form input { padding: 6px; width: 260px; }
+  .cart-row {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+  }
+  .cart-row .cart-row-name { font-weight: 600; font-size: 14px; }
+  .cart-row .cart-row-meta { font-size: 12px; color: var(--color-text-muted); }
 </style>
 
 <script>
@@ -39,6 +66,7 @@ layout: base.njk
   }
   function saveCart(cart) {
     localStorage.setItem("cart", JSON.stringify(cart));
+    document.dispatchEvent(new Event("cart:updated"));
   }
 
   function renderCart() {
@@ -46,15 +74,23 @@ layout: base.njk
     const el = document.getElementById("cart-items");
 
     if (cart.length === 0) {
-      el.innerHTML = "<p>Your cart is empty.</p>";
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🛒</div>
+          <p>Your cart is empty.</p>
+          <a href="/catalog/" class="btn btn-outline-primary btn-sm">Browse products</a>
+        </div>`;
       document.getElementById("cart-total").textContent = "0";
       return;
     }
 
     el.innerHTML = cart.map((item, idx) => `
       <div class="cart-row">
-        <span>${item.name} (${item.size}) x ${item.qty} - ₹${item.price * item.qty}</span>
-        <button onclick="removeItem(${idx})">Remove</button>
+        <div>
+          <div class="cart-row-name">${item.name}</div>
+          <div class="cart-row-meta">${item.size} · Qty ${item.qty} · ₹${item.price * item.qty}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="removeItem(${idx})">Remove</button>
       </div>
     `).join("");
 
@@ -93,7 +129,7 @@ layout: base.njk
     };
 
     const resultEl = document.getElementById("order-result");
-    resultEl.textContent = "Placing order...";
+    resultEl.innerHTML = `<div class="alert alert-info">Placing order...</div>`;
 
     try {
       const res = await fetch("/api/order", {
@@ -105,14 +141,15 @@ layout: base.njk
 
       if (data.success) {
         localStorage.removeItem("cart");
-        resultEl.innerHTML = `<p>Order placed! Your order ID is <b>${data.order_id}</b>. A confirmation email has been sent.</p>`;
+        document.dispatchEvent(new Event("cart:updated"));
+        resultEl.innerHTML = `<div class="alert alert-success">Order placed! Your order ID is <b>${data.order_id}</b>. A confirmation email has been sent.</div>`;
         document.getElementById("cart-items").innerHTML = "";
         document.getElementById("checkout-form").style.display = "none";
       } else {
-        resultEl.textContent = "Order failed: " + (data.error || "unknown error");
+        resultEl.innerHTML = `<div class="alert alert-danger">Order failed: ${data.error || "unknown error"}</div>`;
       }
     } catch (err) {
-      resultEl.textContent = "Order failed. Check console.";
+      resultEl.innerHTML = `<div class="alert alert-danger">Order failed. Check console.</div>`;
       console.error(err);
     }
   });

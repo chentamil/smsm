@@ -1,60 +1,68 @@
 ---
-title: Admin
-layout: base.njk
+title: Admin Dashboard
+layout: admin-base.njk
 ---
-<h1>Admin Dashboard</h1>
-<p><button onclick="logout()">Logout</button></p>
+<div style="display:flex; justify-content:flex-end; margin-bottom: var(--space-3);">
+  <button class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+</div>
+
+<h2>Add Product</h2>
+<form id="add-form" class="surface-card">
+  <div class="form-field">
+    <label class="form-label" for="p-name">Product name</label>
+    <input type="text" class="form-control" id="p-name" required>
+  </div>
+  <div class="form-field">
+    <label class="form-label" for="p-photo">Photo URL</label>
+    <input type="text" class="form-control" id="p-photo" required>
+  </div>
+  <div class="form-field">
+    <label class="form-label" for="p-sizes">Sizes (JSON)</label>
+    <input type="text" class="form-control" id="p-sizes" placeholder='{"S":100,"M":120}' required>
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">Add Product</button>
+</form>
+<div id="add-result" style="margin-top: var(--space-2);"></div>
+
+<h2 style="margin-top: var(--space-5);">Products</h2>
+<div id="product-list">
+  <div class="skeleton skeleton-line" style="height:60px;"></div>
+</div>
+
+<h2 style="margin-top: var(--space-5);">Orders</h2>
+<div id="order-list">
+  <div class="skeleton skeleton-line" style="height:60px;"></div>
+</div>
+
 <script>
   async function logout() {
     await fetch("/api/admin-logout", { method: "POST" });
     window.location.href = "/admin-login/";
   }
-</script>
 
-<h2>Add Product</h2>
-<form id="add-form">
-  <div><input type="text" id="p-name" placeholder="Product name" required></div>
-  <div><input type="text" id="p-photo" placeholder="Photo URL" required></div>
-  <div><input type="text" id="p-sizes" placeholder='Sizes as JSON e.g. {"S":100,"M":120}' required></div>
-  <button type="submit">Add Product</button>
-</form>
-<p id="add-result"></p>
-
-<h2>Products</h2>
-<div id="product-list">Loading...</div>
-
-<h2>Orders</h2>
-<div id="order-list">Loading...</div>
-
-<style>
-  form div { margin-bottom: 8px; }
-  form input { padding: 6px; width: 320px; }
-  table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-  th, td { border: 1px solid #ddd; padding: 6px 10px; text-align: left; font-size: 14px; }
-</style>
-
-<script>
   async function loadProducts() {
     const res = await fetch("/api/admin/products");
     const products = await res.json();
     const el = document.getElementById("product-list");
 
     if (!Array.isArray(products) || products.length === 0) {
-      el.innerHTML = "<p>No products yet.</p>";
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>No products yet.</p></div>`;
       return;
     }
 
     el.innerHTML = `
-      <table>
-        <tr><th>Name</th><th>Photo</th><th>Sizes</th><th>Actions</th></tr>
-        ${products.map(p => `
-          <tr>
-            <td>${p.name}</td>
-            <td>${p.photo}</td>
-            <td>${JSON.stringify(p.sizes)}</td>
-            <td><button onclick="deleteProduct(${p.id})">Delete</button></td>
-          </tr>
-        `).join("")}
+      <table class="table-app">
+        <thead><tr><th>Name</th><th>Photo</th><th>Sizes</th><th>Actions</th></tr></thead>
+        <tbody>
+          ${products.map(p => `
+            <tr>
+              <td data-label="Name">${p.name}</td>
+              <td data-label="Photo"><span style="word-break:break-all; font-size:12px;">${p.photo}</span></td>
+              <td data-label="Sizes">${JSON.stringify(p.sizes)}</td>
+              <td data-label="Actions"><button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Delete</button></td>
+            </tr>
+          `).join("")}
+        </tbody>
       </table>
     `;
   }
@@ -77,7 +85,7 @@ layout: base.njk
     try {
       sizes = JSON.parse(document.getElementById("p-sizes").value);
     } catch {
-      resultEl.textContent = "Sizes must be valid JSON, e.g. {\"S\":100,\"M\":120}";
+      resultEl.innerHTML = `<div class="alert alert-danger">Sizes must be valid JSON, e.g. {"S":100,"M":120}</div>`;
       return;
     }
 
@@ -93,11 +101,11 @@ layout: base.njk
     const data = await res.json();
 
     if (data.success) {
-      resultEl.textContent = "Product added.";
+      resultEl.innerHTML = `<div class="alert alert-success">Product added.</div>`;
       document.getElementById("add-form").reset();
       loadProducts();
     } else {
-      resultEl.textContent = "Error: " + (data.error || "unknown");
+      resultEl.innerHTML = `<div class="alert alert-danger">${data.error || "unknown error"}</div>`;
     }
   });
 
@@ -107,28 +115,30 @@ layout: base.njk
     const el = document.getElementById("order-list");
 
     if (!Array.isArray(orders) || orders.length === 0) {
-      el.innerHTML = "<p>No orders yet.</p>";
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><p>No orders yet.</p></div>`;
       return;
     }
 
     const statuses = ["UNPAID", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"];
 
     el.innerHTML = `
-      <table>
-        <tr><th>Order ID</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr>
-        ${orders.map(o => `
-          <tr>
-            <td>${o.order_id}</td>
-            <td>${o.customer.name}<br>${o.customer.email}</td>
-            <td>₹${o.amount}</td>
-            <td>
-              <select onchange="updateStatus('${o.order_id}', this.value)">
-                ${statuses.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
-              </select>
-            </td>
-            <td>${new Date(o.date).toLocaleString()}</td>
-          </tr>
-        `).join("")}
+      <table class="table-app">
+        <thead><tr><th>Order ID</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          ${orders.map(o => `
+            <tr>
+              <td data-label="Order ID">${o.order_id}</td>
+              <td data-label="Customer">${o.customer.name}<br><span style="font-size:12px; color:var(--color-text-muted);">${o.customer.email}</span></td>
+              <td data-label="Amount">₹${o.amount}</td>
+              <td data-label="Status">
+                <select class="form-select form-select-sm" style="width:auto;" onchange="updateStatus('${o.order_id}', this.value)">
+                  ${statuses.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
+                </select>
+              </td>
+              <td data-label="Date">${new Date(o.date).toLocaleString()}</td>
+            </tr>
+          `).join("")}
+        </tbody>
       </table>
     `;
   }
