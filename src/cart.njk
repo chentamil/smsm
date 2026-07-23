@@ -15,10 +15,16 @@ layout: base.njk
   <div><label>Address: <input type="text" id="c-address" required></label></div>
   <div><label>City: <input type="text" id="c-city" required></label></div>
   <div><label>State: <input type="text" id="c-state" required></label></div>
+
+  <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
+  <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1"></div>
+
   <button type="submit">Place Order (Cash on Delivery)</button>
 </form>
 
 <div id="order-result"></div>
+
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
 <style>
   #cart-items { margin-bottom: 16px; }
@@ -72,6 +78,12 @@ layout: base.njk
       return;
     }
 
+    const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
+    if (!turnstileToken) {
+      alert("Please complete the captcha check.");
+      return;
+    }
+
     const customer = {
       name: document.getElementById("c-name").value,
       email: document.getElementById("c-email").value,
@@ -87,7 +99,7 @@ layout: base.njk
       const res = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, items: cart })
+        body: JSON.stringify({ customer, items: cart, turnstileToken })
       });
       const data = await res.json();
 
