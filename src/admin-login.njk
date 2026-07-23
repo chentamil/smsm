@@ -1,0 +1,32 @@
+---
+title: Admin Login
+layout: base.njk
+---
+<h1>Admin Login</h1>
+
+<form id="login-form">
+  <input type="password" id="password" placeholder="Password" required>
+  <button type="submit">Login</button>
+</form>
+<p id="login-result"></p>
+
+<script>
+  document.getElementById("login-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const password = document.getElementById("password").value;
+    const resultEl = document.getElementById("login-result");
+
+    const res = await fetch("/api/admin-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      window.location.href = "/admin/";
+    } else {
+      resultEl.textContent = data.error || "Login failed";
+    }
+  });
+</script>

@@ -56,7 +56,7 @@ async function sendOrderEmail(apiKey, customer, orderId, items, amount) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      from: "Orders <onboarding@resend.dev>",
+      from: "Orders <info@achabazar.com>",
       to: [customer.email],
       subject: `Order Confirmation #${orderId}`,
       html
