@@ -3,6 +3,13 @@ title: Admin
 layout: base.njk
 ---
 <h1>Admin Dashboard</h1>
+<p><button onclick="logout()">Logout</button></p>
+<script>
+  async function logout() {
+    await fetch("/api/admin-logout", { method: "POST" });
+    window.location.href = "/admin-login/";
+  }
+</script>
 
 <h2>Add Product</h2>
 <form id="add-form">

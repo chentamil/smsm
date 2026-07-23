@@ -1,16 +1,23 @@
+import { signSession, isRateLimited } from "../_lib/auth.js";
+
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const body = await request.json();
 
-  if (!env.ADMIN_PASSWORD) {
-    return json({ error: "ADMIN_PASSWORD not configured on server" }, 500);
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  if (isRateLimited(ip)) {
+    return json({ error: "Too many attempts. Try again in a few minutes." }, 429);
   }
 
+  if (!env.ADMIN_PASSWORD || !env.SESSION_SECRET) {
+    return json({ error: "ADMIN_PASSWORD or SESSION_SECRET not configured on server" }, 500);
+  }
+
+  const body = await request.json();
   if (body.password !== env.ADMIN_PASSWORD) {
     return json({ error: "Wrong password" }, 401);
   }
 
-  const token = await hash(env.ADMIN_PASSWORD);
+  const token = await signSession(env.SESSION_SECRET, { u: "admin" });
 
   return new Response(JSON.stringify({ success: true }), {
     status: 200,
@@ -19,12 +26,6 @@ export async function onRequestPost(context) {
       "Set-Cookie": `admin_session=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=86400`
     }
   });
-}
-
-async function hash(text) {
-  const data = new TextEncoder().encode(text);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
 function json(obj, status = 200) {
