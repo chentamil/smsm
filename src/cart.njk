@@ -1,0 +1,109 @@
+---
+title: Cart & Checkout
+layout: base.njk
+---
+<h1>Your Cart</h1>
+<p><a href="/catalog/">← Back to catalog</a></p>
+
+<div id="cart-items"></div>
+<h3>Total: ₹<span id="cart-total">0</span></h3>
+
+<h2>Checkout</h2>
+<form id="checkout-form">
+  <div><label>Name: <input type="text" id="c-name" required></label></div>
+  <div><label>Email: <input type="email" id="c-email" required></label></div>
+  <div><label>Address: <input type="text" id="c-address" required></label></div>
+  <div><label>City: <input type="text" id="c-city" required></label></div>
+  <div><label>State: <input type="text" id="c-state" required></label></div>
+  <button type="submit">Place Order (Cash on Delivery)</button>
+</form>
+
+<div id="order-result"></div>
+
+<style>
+  #cart-items { margin-bottom: 16px; }
+  .cart-row { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 6px 0; }
+  form div { margin-bottom: 8px; }
+  form input { padding: 6px; width: 260px; }
+</style>
+
+<script>
+  function getCart() {
+    return JSON.parse(localStorage.getItem("cart") || "[]");
+  }
+  function saveCart(cart) {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }
+
+  function renderCart() {
+    const cart = getCart();
+    const el = document.getElementById("cart-items");
+
+    if (cart.length === 0) {
+      el.innerHTML = "<p>Your cart is empty.</p>";
+      document.getElementById("cart-total").textContent = "0";
+      return;
+    }
+
+    el.innerHTML = cart.map((item, idx) => `
+      <div class="cart-row">
+        <span>${item.name} (${item.size}) x ${item.qty} - ₹${item.price * item.qty}</span>
+        <button onclick="removeItem(${idx})">Remove</button>
+      </div>
+    `).join("");
+
+    const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    document.getElementById("cart-total").textContent = total;
+  }
+
+  function removeItem(idx) {
+    const cart = getCart();
+    cart.splice(idx, 1);
+    saveCart(cart);
+    renderCart();
+  }
+
+  document.getElementById("checkout-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const cart = getCart();
+    if (cart.length === 0) {
+      alert("Your cart is empty.");
+      return;
+    }
+
+    const customer = {
+      name: document.getElementById("c-name").value,
+      email: document.getElementById("c-email").value,
+      address: document.getElementById("c-address").value,
+      city: document.getElementById("c-city").value,
+      state: document.getElementById("c-state").value
+    };
+
+    const resultEl = document.getElementById("order-result");
+    resultEl.textContent = "Placing order...";
+
+    try {
+      const res = await fetch("/api/order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customer, items: cart })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        localStorage.removeItem("cart");
+        resultEl.innerHTML = `<p>Order placed! Your order ID is <b>${data.order_id}</b>. A confirmation email has been sent.</p>`;
+        document.getElementById("cart-items").innerHTML = "";
+        document.getElementById("checkout-form").style.display = "none";
+      } else {
+        resultEl.textContent = "Order failed: " + (data.error || "unknown error");
+      }
+    } catch (err) {
+      resultEl.textContent = "Order failed. Check console.";
+      console.error(err);
+    }
+  });
+
+  renderCart();
+</script>

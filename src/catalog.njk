@@ -3,6 +3,7 @@ title: Catalog
 layout: base.njk
 ---
 <h1>Our Products</h1>
+<p><a href="/cart/">View Cart (<span id="cart-count">0</span>)</a></p>
 
 <div id="catalog">Loading products...</div>
 
@@ -15,6 +16,30 @@ layout: base.njk
 </style>
 
 <script>
+  function getCart() {
+    return JSON.parse(localStorage.getItem("cart") || "[]");
+  }
+  function saveCart(cart) {
+    localStorage.setItem("cart", JSON.stringify(cart));
+    updateCartCount();
+  }
+  function updateCartCount() {
+    const cart = getCart();
+    const count = cart.reduce((sum, i) => sum + i.qty, 0);
+    document.getElementById("cart-count").textContent = count;
+  }
+  function addToCart(id, name, photo, size, price) {
+    const cart = getCart();
+    const existing = cart.find(i => i.id === id && i.size === size);
+    if (existing) {
+      existing.qty += 1;
+    } else {
+      cart.push({ id, name, photo, size, price, qty: 1 });
+    }
+    saveCart(cart);
+    alert(name + " (" + size + ") added to cart");
+  }
+
   async function loadCatalog() {
     const el = document.getElementById("catalog");
     try {
@@ -28,15 +53,15 @@ layout: base.njk
 
       el.innerHTML = products.map(p => {
         const sizeOptions = Object.entries(p.sizes)
-          .map(([size, price]) => `<option value="${size}">${size} - ₹${price}</option>`)
+          .map(([size, price]) => `<option value="${size}" data-price="${price}">${size} - ₹${price}</option>`)
           .join("");
 
         return `
           <div class="card">
             <img src="${p.photo}" alt="${p.name}">
             <h3>${p.name}</h3>
-            <select>${sizeOptions}</select>
-            <button onclick="alert('Add to cart coming in the next step')">Add to cart</button>
+            <select id="size-${p.id}">${sizeOptions}</select>
+            <button onclick="addFromCard(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${p.photo}')">Add to cart</button>
           </div>
         `;
       }).join("");
@@ -47,5 +72,13 @@ layout: base.njk
     }
   }
 
+  function addFromCard(id, name, photo) {
+    const select = document.getElementById("size-" + id);
+    const size = select.value;
+    const price = Number(select.selectedOptions[0].dataset.price);
+    addToCart(id, name, photo, size, price);
+  }
+
+  updateCartCount();
   loadCatalog();
 </script>
