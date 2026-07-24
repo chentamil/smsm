@@ -1,9 +1,11 @@
 {
-  "siteName": "SMSM Store",
+  "siteName": "Maharaja Retail",
   "tagline": "Fresh picks, delivered to your door.",
-  "supportEmail": "support@example.com",
-  "supportPhone": "+91 90000 00000",
+  "supportEmail": "info@achabazar.com",
+  "supportPhone": "+917373020972",
   "footerNote": "Cash on delivery available on all orders.",
+  "upiId": "9994589034@sbi",
+  "upiPayeeName": "Maharaja Retail",
   "nav": [
     { "label": "Home", "url": "/", "icon": "bi-house" },
     { "label": "Shop", "url": "/catalog/", "icon": "bi-shop" },
@@ -16,6 +18,7 @@
   ],
   "adminNav": [
     { "label": "Products", "url": "#products-section", "icon": "bi-box-seam" },
-    { "label": "Orders", "url": "#orders-section", "icon": "bi-receipt" }
+    { "label": "Orders", "url": "#orders-section", "icon": "bi-receipt" },
+    { "label": "Settings", "url": "#settings-section", "icon": "bi-gear" }
   ]
 }

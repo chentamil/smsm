@@ -2,6 +2,8 @@
 title: Catalog
 layout: base.njk
 ---
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe.css">
+
 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
   <input type="text" class="form-control" id="searchInput" placeholder="Search products, sizes, price..." style="flex:1; min-width:200px;">
   <select class="form-select" id="sortSelect" style="width:auto;">
@@ -14,13 +16,33 @@ layout: base.njk
   </button>
 </div>
 
-<div id="catalog">
-  <div class="skeleton-card" style="margin-bottom: var(--space-3);">
-    <div class="skeleton" style="height:110px; border-radius: var(--radius-md);"></div>
+<div class="row" id="catalog">
+  <div class="col-12 col-md-4 mb-4">
+    <div class="skeleton-card">
+      <div class="skeleton" style="aspect-ratio:1/1;"></div>
+      <div class="skeleton skeleton-line" style="width: 70%;"></div>
+      <div class="skeleton skeleton-line" style="width: 40%;"></div>
+    </div>
   </div>
-  <div class="skeleton-card" style="margin-bottom: var(--space-3);">
-    <div class="skeleton" style="height:110px; border-radius: var(--radius-md);"></div>
+  <div class="col-12 col-md-4 mb-4 d-none d-md-block">
+    <div class="skeleton-card">
+      <div class="skeleton" style="aspect-ratio:1/1;"></div>
+      <div class="skeleton skeleton-line" style="width: 70%;"></div>
+      <div class="skeleton skeleton-line" style="width: 40%;"></div>
+    </div>
   </div>
+  <div class="col-12 col-md-4 mb-4 d-none d-md-block">
+    <div class="skeleton-card">
+      <div class="skeleton" style="aspect-ratio:1/1;"></div>
+      <div class="skeleton skeleton-line" style="width: 70%;"></div>
+      <div class="skeleton skeleton-line" style="width: 40%;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Shown only once the cart has at least one item -->
+<div class="proceed-cart-btn" id="proceedCartBtn" onclick="window.location.href='/cart/'">
+  Proceed To Cart
 </div>
 
 <!-- Cart preview modal (Bootstrap modal - allowed per design brief) -->
@@ -33,11 +55,30 @@ layout: base.njk
       </div>
       <div class="modal-body" id="cartContent"></div>
       <div class="modal-footer">
-        <a href="/cart/" class="btn btn-primary btn-block" id="checkoutBtn">Proceed to Checkout</a>
+        <a href="/cart/" class="btn btn-primary btn-block">Proceed to Checkout</a>
       </div>
     </div>
   </div>
 </div>
+
+<script type="module">
+  import PhotoSwipeLightbox from 'https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe-lightbox.esm.js';
+
+  // Note: each product currently has a single photo. This gallery is wired
+  // up so that adding more photos per product later (photo1/photo2/photo3)
+  // just means rendering more .pswp-gallery-item anchors per card - the
+  // lightbox/swipe behavior already works across however many are present.
+  window.initPhotoSwipe = function () {
+    if (window._pswpLightbox) window._pswpLightbox.destroy();
+    const lightbox = new PhotoSwipeLightbox({
+      gallery: '#catalog',
+      children: '.pswp-gallery-item',
+      pswpModule: () => import('https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe.esm.js')
+    });
+    lightbox.init();
+    window._pswpLightbox = lightbox;
+  };
+</script>
 
 <script>
   let products = [];
@@ -57,9 +98,11 @@ layout: base.njk
 
       if (!Array.isArray(products) || products.length === 0) {
         catalogEl.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon"><i class="bi bi-shop"></i></div>
-            <p>No products here yet. Check back soon.</p>
+          <div class="col-12">
+            <div class="empty-state">
+              <div class="empty-icon"><i class="bi bi-shop"></i></div>
+              <p>No products here yet. Check back soon.</p>
+            </div>
           </div>`;
         return;
       }
@@ -67,35 +110,41 @@ layout: base.njk
       renderCatalog();
       restoreCart();
     } catch (err) {
-      catalogEl.innerHTML = `<div class="alert alert-danger">Could not load products. Please refresh.</div>`;
+      catalogEl.innerHTML = `<div class="col-12"><div class="alert alert-danger">Could not load products. Please refresh.</div></div>`;
       console.error(err);
     }
   }
 
   function renderCatalog() {
     catalogEl.innerHTML = filteredProducts.map(p => `
-      <div class="product-row">
-        <div class="product-row-img">
-          <img src="${p.photo}" alt="${p.name}" loading="lazy"
-               onerror="this.src='https://placehold.co/200x200?text=No+Image'">
-        </div>
-        <div class="product-row-body">
-          <h3 class="product-row-name">${p.name}</h3>
-          <div class="product-row-price">Selected: ₹<span id="price_${p.id}">0</span></div>
-          ${Object.entries(p.sizes).map(([size, price]) => `
-            <div class="size-row">
-              <span class="size-label">${size} (₹${price})</span>
-              <div class="qty-stepper">
-                <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',-1)">−</button>
-                <input type="number" class="form-control qty-input" id="qty_${p.id}_${size}" value="0" min="0"
-                       oninput="manualQty(${p.id},'${size}')">
-                <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',1)">+</button>
+      <div class="col-12 col-md-4 mb-4">
+        <div class="product-card">
+          <div class="product-img-wrap">
+            <a href="${p.photo}" class="pswp-gallery-item" target="_blank" rel="noopener">
+              <img src="${p.photo}" alt="${p.name}" loading="lazy"
+                   onerror="this.src='https://placehold.co/600x600?text=No+Image'">
+            </a>
+          </div>
+          <div class="product-body">
+            <h3 class="product-name">${p.name}</h3>
+            <div style="font-size:13px; color:var(--color-text-muted);">Selected: ₹<span id="price_${p.id}">0</span></div>
+            ${Object.entries(p.sizes).map(([size, price]) => `
+              <div class="size-row">
+                <span class="size-label">${size} (₹${price})</span>
+                <div class="qty-stepper">
+                  <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',-1)">−</button>
+                  <input type="number" class="form-control qty-input" id="qty_${p.id}_${size}" value="0" min="0"
+                         oninput="manualQty(${p.id},'${size}')">
+                  <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',1)">+</button>
+                </div>
               </div>
-            </div>
-          `).join("")}
+            `).join("")}
+          </div>
         </div>
       </div>
     `).join("");
+
+    if (window.initPhotoSwipe) window.initPhotoSwipe();
   }
 
   function changeQty(id, size, delta) {
@@ -125,6 +174,7 @@ layout: base.njk
     localStorage.setItem("cart", JSON.stringify(cart));
     document.dispatchEvent(new Event("cart:updated"));
     updateCatalogPrice(id);
+    refreshProceedButton();
   }
 
   function restoreCart() {
@@ -134,6 +184,7 @@ layout: base.njk
       updateCatalogPrice(c.product.id);
     });
     document.dispatchEvent(new Event("cart:updated"));
+    refreshProceedButton();
   }
 
   function updateCatalogPrice(id) {
@@ -145,6 +196,15 @@ layout: base.njk
     });
     const priceEl = document.getElementById(`price_${id}`);
     if (priceEl) priceEl.textContent = total.toLocaleString("en-IN");
+  }
+
+  function refreshProceedButton() {
+    const btn = document.getElementById("proceedCartBtn");
+    if (Object.keys(cart).length > 0) {
+      btn.classList.add("visible");
+    } else {
+      btn.classList.remove("visible");
+    }
   }
 
   // ---- Cart modal ----

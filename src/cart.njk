@@ -40,7 +40,7 @@ layout: base.njk
          style="position:absolute; left:-9999px; width:1px; height:1px;" aria-hidden="true">
 
   <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
-  <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1" style="margin: var(--space-3) 0;"></div>
+  <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY" style="margin: var(--space-3) 0;"></div>
 
   <button type="submit" class="btn btn-primary btn-block" id="placeOrderBtn">Place Order (Cash on Delivery)</button>
 </form>
@@ -163,11 +163,12 @@ layout: base.njk
       const data = await res.json();
 
       if (data.success) {
+        const orderedItems = cartAsItemsArray(cart);
         localStorage.removeItem("cart");
         document.dispatchEvent(new Event("cart:updated"));
-        resultEl.innerHTML = `<div class="alert alert-success">Order placed! Your order ID is <b>${data.order_id}</b>. A confirmation email has been sent.</div>`;
         document.getElementById("cart-items").innerHTML = "";
         document.getElementById("checkout-form").style.display = "none";
+        renderReceipt(data.order_id, customer, orderedItems, data.amount);
       } else {
         resultEl.innerHTML = `<div class="alert alert-danger">Order failed: ${data.error || "unknown error"}</div>`;
         btn.disabled = false;
@@ -180,6 +181,85 @@ layout: base.njk
       btn.textContent = "Place Order (Cash on Delivery)";
     }
   });
+
+  // ---- Receipt: UPI QR code, amount in words, printable ----
+  function renderReceipt(orderId, customer, items, amount) {
+    const resultEl = document.getElementById("order-result");
+
+    const upiUri = `upi://pay?pa={{ site.upiId }}&pn=${encodeURIComponent("{{ site.upiPayeeName }}")}&am=${amount}&cu=INR&tn=${encodeURIComponent("Order " + orderId)}`;
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}`;
+
+    const itemRows = items.map(i => `
+      <tr>
+        <td data-label="Item">${i.name} (${i.size})</td>
+        <td data-label="Qty">${i.qty}</td>
+        <td data-label="Total">₹${i.price * i.qty}</td>
+      </tr>`).join("");
+
+    resultEl.innerHTML = `
+      <div class="alert alert-success">Order placed! A confirmation email has been sent.</div>
+
+      <div class="receipt-card" id="receipt">
+        <h3 style="margin-bottom:0;">{{ site.siteName }}</h3>
+        <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:var(--space-3);">Order Receipt</p>
+
+        <p style="margin:0;"><strong>Order ID:</strong> ${orderId}</p>
+        <p style="margin:0;"><strong>Name:</strong> ${customer.name}</p>
+        <p style="margin:0;"><strong>Delivery:</strong> ${customer.address}, ${customer.city}, ${customer.state}</p>
+        <p style="margin:0 0 var(--space-3);"><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+
+        <table class="table-app">
+          <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+          <tfoot><tr><td colspan="2" style="text-align:right; font-weight:700;">Grand Total</td><td style="font-weight:700;">₹${amount}</td></tr></tfoot>
+        </table>
+
+        <p class="receipt-words">Amount in words: ${amountToWords(amount)} only</p>
+
+        <div class="receipt-qr">
+          <img src="${qrImgUrl}" alt="UPI payment QR code">
+          <p style="font-size:12px; color:var(--color-text-muted); margin-top:var(--space-1);">Scan to pay via UPI (optional - order is confirmed as Cash on Delivery)</p>
+        </div>
+      </div>
+
+      <div id="order-result-actions" class="d-flex gap-2" style="margin-top: var(--space-3);">
+        <button class="btn btn-secondary btn-block" onclick="window.print()"><i class="bi bi-printer"></i> Print Receipt</button>
+        <a href="/catalog/" class="btn btn-primary btn-block">Continue Shopping</a>
+      </div>
+    `;
+  }
+
+  // Indian numbering system (lakh/crore) amount-in-words converter
+  function amountToWords(num) {
+    num = Math.round(Number(num));
+    if (num === 0) return "Zero Rupees";
+
+    const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
+      "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+
+    function twoDigits(n) {
+      if (n < 20) return ones[n];
+      return tens[Math.floor(n / 10)] + (n % 10 ? " " + ones[n % 10] : "");
+    }
+    function threeDigits(n) {
+      if (n < 100) return twoDigits(n);
+      return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + twoDigits(n % 100) : "");
+    }
+
+    let crore = Math.floor(num / 10000000);
+    let lakh = Math.floor((num % 10000000) / 100000);
+    let thousand = Math.floor((num % 100000) / 1000);
+    let rest = num % 1000;
+
+    let words = "";
+    if (crore) words += threeDigits(crore) + " Crore ";
+    if (lakh) words += threeDigits(lakh) + " Lakh ";
+    if (thousand) words += threeDigits(thousand) + " Thousand ";
+    if (rest) words += threeDigits(rest);
+
+    return "Rupees " + words.trim();
+  }
 
   renderCart();
 </script>

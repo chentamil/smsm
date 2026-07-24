@@ -809,3 +809,104 @@ input:focus, select:focus {
 @media (min-width: 768px) {
   .product-row .product-row-img { width: 110px; height: 110px; }
 }
+
+/* ==========================================================================
+   Cart total pill (desktop topbar)
+   ========================================================================== */
+
+.cart-total-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  transition: background var(--transition-fast);
+}
+.cart-total-pill:hover { background: var(--color-accent-light); color: var(--color-accent-dark); }
+
+/* ==========================================================================
+   Proceed-to-cart button (shown only when the cart has items)
+   ========================================================================== */
+
+.proceed-cart-btn {
+  display: none;
+  position: fixed;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(var(--bottomnav-height) + var(--space-2));
+  z-index: 1025;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-3);
+  text-align: center;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+}
+.proceed-cart-btn:hover { background: var(--color-primary-dark); }
+.proceed-cart-btn:active { transform: scale(0.98); }
+.proceed-cart-btn.visible { display: block; }
+
+@media (min-width: 768px) {
+  .proceed-cart-btn { left: auto; right: var(--space-4); bottom: var(--space-4); width: 260px; }
+}
+
+/* ==========================================================================
+   Admin: product thumbnail
+   ========================================================================== */
+
+.product-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+}
+
+/* Clickable order row cells (everything except the status dropdown) */
+.order-row-clickable { cursor: pointer; }
+.order-row-clickable:hover { color: var(--color-primary); }
+
+/* ==========================================================================
+   Printable receipt
+   ========================================================================== */
+
+.receipt-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-top: var(--space-3);
+}
+.receipt-qr {
+  text-align: center;
+  margin: var(--space-3) 0;
+}
+.receipt-qr img {
+  width: 180px;
+  height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+.receipt-words {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
+@media print {
+  body * { visibility: hidden; }
+  #receipt, #receipt * { visibility: visible; }
+  #receipt {
+    position: absolute;
+    top: 0; left: 0; width: 100%;
+    padding: var(--space-4);
+  }
+  .app-topbar, .app-bottomnav, .app-footer, #order-result-actions { display: none !important; }
+}

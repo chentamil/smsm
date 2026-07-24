@@ -22,6 +22,9 @@
     </button>
     <span class="brand"><span class="brand-dot"></span> {{ title }}</span>
     <div class="topbar-actions">
+      <a href="/" target="_blank" rel="noopener" class="icon-btn" aria-label="Visit store" title="Visit Store"><i class="bi bi-shop"></i></a>
+      <button class="icon-btn" type="button" data-bs-toggle="modal" data-bs-target="#helpModal" aria-label="Help" title="Help"><i class="bi bi-question-circle"></i></button>
+      <a href="#settings-section" class="icon-btn" aria-label="Settings" title="Settings"><i class="bi bi-gear"></i></a>
       <button class="btn btn-secondary btn-sm" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Logout</button>
     </div>
   </header>
@@ -54,6 +57,35 @@
     <main class="admin-content">
       {{ content | safe }}
     </main>
+  </div>
+
+  <!-- Help modal -->
+  <div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-question-circle"></i> Help</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body stack-md">
+          <div>
+            <strong>Adding a product</strong>
+            <p style="margin:0;">Fill in the name, a photo URL, and sizes as JSON, e.g. <code>{"S":100,"M":120}</code>.</p>
+          </div>
+          <div>
+            <strong>Managing orders</strong>
+            <p style="margin:0;">Click any order row to see full details. Use the status dropdown to update it as you process the order.</p>
+          </div>
+          <div>
+            <strong>Need more help?</strong>
+            <p style="margin:0;">Email <a href="mailto:{{ site.supportEmail }}">{{ site.supportEmail }}</a> or call {{ site.supportPhone }}.</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>

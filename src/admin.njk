@@ -26,36 +26,179 @@ layout: admin-base.njk
 </div>
 
 <h2 style="margin-top: var(--space-5);" id="orders-section">Orders</h2>
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <input type="text" class="form-control" id="orderSearchInput" placeholder="Search by Order ID, email, name, amount..." style="flex:1; min-width:200px;">
+  <button class="btn btn-secondary" type="button" onclick="clearOrderSearch()">Clear</button>
+</div>
 <div id="order-list">
   <div class="skeleton skeleton-line" style="height:60px;"></div>
 </div>
 
+<h2 style="margin-top: var(--space-5);" id="settings-section">Store Settings</h2>
+<form id="settings-form" class="surface-card">
+  <div class="form-field">
+    <label class="form-label" for="s-name">Store name</label>
+    <input type="text" class="form-control" id="s-name">
+  </div>
+  <div class="form-field">
+    <label class="form-label" for="s-address">Address</label>
+    <input type="text" class="form-control" id="s-address">
+  </div>
+  <div class="row g-2">
+    <div class="col-6 form-field">
+      <label class="form-label" for="s-gstin">GSTIN</label>
+      <input type="text" class="form-control" id="s-gstin">
+    </div>
+    <div class="col-6 form-field">
+      <label class="form-label" for="s-mobile">Mobile</label>
+      <input type="text" class="form-control" id="s-mobile">
+    </div>
+  </div>
+  <div class="form-field">
+    <label class="form-label" for="s-email">Contact email</label>
+    <input type="email" class="form-control" id="s-email">
+  </div>
+  <button type="submit" class="btn btn-primary btn-block">Save Settings</button>
+</form>
+<div id="settings-result" style="margin-top: var(--space-2);"></div>
+
+<!-- Edit Product Modal -->
+<div class="modal fade" id="editProductModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-p-id">
+        <div class="form-field">
+          <label class="form-label" for="edit-p-name">Product name</label>
+          <input type="text" class="form-control" id="edit-p-name" placeholder="e.g. Colgate Salt">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="edit-p-photo">Photo URL</label>
+          <input type="text" class="form-control" id="edit-p-photo" placeholder="https://...">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="edit-p-sizes">Sizes (JSON)</label>
+          <input type="text" class="form-control" id="edit-p-sizes" placeholder='{"S":100,"M":120}'>
+        </div>
+        <div id="edit-p-result"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" type="button" onclick="deleteProductFromModal()"><i class="bi bi-trash"></i> Delete</button>
+        <button class="btn btn-primary" type="button" onclick="saveProductEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Details Modal -->
+<div class="modal fade" id="orderModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Order Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="orderModalBody"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+  let allProducts = [];
+  let allOrders = [];
+  let editProductModalInstance, orderModalInstance;
+
   async function loadProducts() {
     const res = await fetch("/api/admin/products");
-    const products = await res.json();
+    allProducts = await res.json();
     const el = document.getElementById("product-list");
 
-    if (!Array.isArray(products) || products.length === 0) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>No products yet.</p></div>`;
+    if (!Array.isArray(allProducts) || allProducts.length === 0) {
+      el.innerHTML = `<div class="empty-state"><i class="bi bi-box-seam empty-icon"></i><p>No products yet.</p></div>`;
       return;
     }
 
     el.innerHTML = `
       <table class="table-app">
-        <thead><tr><th>Name</th><th>Photo</th><th>Sizes</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Image</th><th>Name</th><th>Sizes</th><th>Actions</th></tr></thead>
         <tbody>
-          ${products.map(p => `
+          ${allProducts.map(p => `
             <tr>
+              <td data-label="Image"><img class="product-thumb" src="${p.photo}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=No+Image'"></td>
               <td data-label="Name">${p.name}</td>
-              <td data-label="Photo"><span style="word-break:break-all; font-size:12px;">${p.photo}</span></td>
               <td data-label="Sizes">${JSON.stringify(p.sizes)}</td>
-              <td data-label="Actions"><button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="bi bi-trash"></i></button></td>
+              <td data-label="Actions">
+                <button class="btn btn-secondary btn-sm" onclick="openEditProduct(${p.id})"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
+              </td>
             </tr>
           `).join("")}
         </tbody>
       </table>
     `;
+  }
+
+  function openEditProduct(id) {
+    const p = allProducts.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById("edit-p-id").value = p.id;
+    document.getElementById("edit-p-name").value = p.name;
+    document.getElementById("edit-p-photo").value = p.photo;
+    document.getElementById("edit-p-sizes").value = JSON.stringify(p.sizes);
+    document.getElementById("edit-p-result").innerHTML = "";
+
+    const modalEl = document.getElementById("editProductModal");
+    if (!editProductModalInstance) editProductModalInstance = new bootstrap.Modal(modalEl);
+    editProductModalInstance.show();
+  }
+
+  async function saveProductEdit() {
+    const resultEl = document.getElementById("edit-p-result");
+    let sizes;
+    try {
+      sizes = JSON.parse(document.getElementById("edit-p-sizes").value);
+    } catch {
+      resultEl.innerHTML = `<div class="alert alert-danger">Sizes must be valid JSON.</div>`;
+      return;
+    }
+
+    const res = await fetch("/api/admin/products", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: Number(document.getElementById("edit-p-id").value),
+        name: document.getElementById("edit-p-name").value,
+        photo: document.getElementById("edit-p-photo").value,
+        sizes
+      })
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      editProductModalInstance.hide();
+      loadProducts();
+    } else {
+      resultEl.innerHTML = `<div class="alert alert-danger">${data.error || "Could not save"}</div>`;
+    }
+  }
+
+  async function deleteProductFromModal() {
+    const id = Number(document.getElementById("edit-p-id").value);
+    if (!confirm("Delete this product?")) return;
+    await fetch("/api/admin/products", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    editProductModalInstance.hide();
+    loadProducts();
   }
 
   async function deleteProduct(id) {
@@ -102,15 +245,18 @@ layout: admin-base.njk
 
   async function loadOrders() {
     const res = await fetch("/api/admin/orders");
-    const orders = await res.json();
+    allOrders = await res.json();
+    renderOrdersTable(allOrders);
+  }
+
+  function renderOrdersTable(orders) {
     const el = document.getElementById("order-list");
+    const statuses = ["UNPAID", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"];
 
     if (!Array.isArray(orders) || orders.length === 0) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">🧾</div><p>No orders yet.</p></div>`;
+      el.innerHTML = `<div class="empty-state"><i class="bi bi-receipt empty-icon"></i><p>No orders found.</p></div>`;
       return;
     }
-
-    const statuses = ["UNPAID", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"];
 
     el.innerHTML = `
       <table class="table-app">
@@ -118,20 +264,52 @@ layout: admin-base.njk
         <tbody>
           ${orders.map(o => `
             <tr>
-              <td data-label="Order ID">${o.order_id}</td>
-              <td data-label="Customer">${o.customer.name}<br><span style="font-size:12px; color:var(--color-text-muted);">${o.customer.email}</span></td>
-              <td data-label="Amount">₹${o.amount}</td>
+              <td data-label="Order ID" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">${o.order_id}</td>
+              <td data-label="Customer" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">${o.customer.name}<br><span style="font-size:12px; color:var(--color-text-muted);">${o.customer.email}</span></td>
+              <td data-label="Amount" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">₹${o.amount}</td>
               <td data-label="Status">
-                <select class="form-select form-select-sm" style="width:auto;" onchange="updateStatus('${o.order_id}', this.value)">
+                <select class="form-select form-select-sm" style="width:auto;" onclick="event.stopPropagation()" onchange="updateStatus('${o.order_id}', this.value)">
                   ${statuses.map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
                 </select>
               </td>
-              <td data-label="Date">${new Date(o.date).toLocaleString()}</td>
+              <td data-label="Date" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">${new Date(o.date).toLocaleString()}</td>
             </tr>
           `).join("")}
         </tbody>
       </table>
     `;
+  }
+
+  function openOrderModal(orderId) {
+    const o = allOrders.find(x => x.order_id === orderId);
+    if (!o) return;
+
+    let grandTotal = 0;
+    const rows = o.items.map(i => {
+      const lineTotal = i.price * i.qty;
+      grandTotal += lineTotal;
+      return `<tr><td data-label="Product">${i.name}</td><td data-label="Size">${i.size}</td><td data-label="Qty">${i.qty}</td><td data-label="Price">₹${i.price}</td><td data-label="Total">₹${lineTotal}</td></tr>`;
+    }).join("");
+
+    document.getElementById("orderModalBody").innerHTML = `
+      <h5>Order #${o.order_id}</h5>
+      <p style="margin-bottom: var(--space-1);"><strong>Customer Info:</strong></p>
+      <p style="margin:0;">Name: ${o.customer.name}</p>
+      <p style="margin:0;">Email: ${o.customer.email}</p>
+      <p style="margin:0;">Address: ${o.customer.address}, ${o.customer.city}, ${o.customer.state}</p>
+      <p style="margin:0 0 var(--space-2);">Date: ${new Date(o.date).toLocaleString()}</p>
+      <p style="margin-bottom: var(--space-3);">Status: <span class="badge" data-status="${o.status}">${o.status}</span></p>
+      <p style="margin-bottom: var(--space-1);"><strong>Items:</strong></p>
+      <table class="table-app">
+        <thead><tr><th>Product</th><th>Size</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td colspan="4" style="text-align:right; font-weight:700;">Grand Total</td><td style="font-weight:700;">₹${grandTotal}</td></tr></tfoot>
+      </table>
+    `;
+
+    const modalEl = document.getElementById("orderModal");
+    if (!orderModalInstance) orderModalInstance = new bootstrap.Modal(modalEl);
+    orderModalInstance.show();
   }
 
   async function updateStatus(orderId, status) {
@@ -140,8 +318,60 @@ layout: admin-base.njk
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ order_id: orderId, status })
     });
+    const o = allOrders.find(x => x.order_id === orderId);
+    if (o) o.status = status;
   }
+
+  document.getElementById("orderSearchInput").addEventListener("input", function () {
+    const q = this.value.toLowerCase();
+    if (!q) { renderOrdersTable(allOrders); return; }
+    const filtered = allOrders.filter(o =>
+      o.order_id.toLowerCase().includes(q) ||
+      o.customer.email.toLowerCase().includes(q) ||
+      o.customer.name.toLowerCase().includes(q) ||
+      o.amount.toString().includes(q)
+    );
+    renderOrdersTable(filtered);
+  });
+
+  function clearOrderSearch() {
+    document.getElementById("orderSearchInput").value = "";
+    renderOrdersTable(allOrders);
+  }
+
+  // ---- Store settings ----
+  async function loadSettings() {
+    const res = await fetch("/api/admin/settings");
+    const s = await res.json();
+    document.getElementById("s-name").value = s.name || "";
+    document.getElementById("s-address").value = s.address || "";
+    document.getElementById("s-gstin").value = s.gstin || "";
+    document.getElementById("s-mobile").value = s.mobile || "";
+    document.getElementById("s-email").value = s.email || "";
+  }
+
+  document.getElementById("settings-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const resultEl = document.getElementById("settings-result");
+
+    const res = await fetch("/api/admin/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: document.getElementById("s-name").value,
+        address: document.getElementById("s-address").value,
+        gstin: document.getElementById("s-gstin").value,
+        mobile: document.getElementById("s-mobile").value,
+        email: document.getElementById("s-email").value
+      })
+    });
+    const data = await res.json();
+    resultEl.innerHTML = data.success
+      ? `<div class="alert alert-success">Settings saved.</div>`
+      : `<div class="alert alert-danger">${data.error || "Could not save"}</div>`;
+  });
 
   loadProducts();
   loadOrders();
+  loadSettings();
 </script>
