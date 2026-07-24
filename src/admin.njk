@@ -2,65 +2,126 @@
 title: Admin Dashboard
 layout: admin-base.njk
 ---
-<h2 id="products-section">Add Product</h2>
-<form id="add-form" class="surface-card">
-  <div class="form-field">
-    <label class="form-label" for="p-name">Product name</label>
-    <input type="text" class="form-control" id="p-name" required>
-  </div>
-  <div class="form-field">
-    <label class="form-label" for="p-photo">Photo URL</label>
-    <input type="text" class="form-control" id="p-photo" required>
-  </div>
-  <div class="form-field">
-    <label class="form-label" for="p-sizes">Sizes (JSON)</label>
-    <input type="text" class="form-control" id="p-sizes" placeholder='{"S":100,"M":120}' required>
-  </div>
-  <button type="submit" class="btn btn-primary btn-block">Add Product</button>
-</form>
-<div id="add-result" style="margin-top: var(--space-2);"></div>
 
-<h2 style="margin-top: var(--space-5);">Products</h2>
-<div id="product-list">
-  <div class="skeleton skeleton-line" style="height:60px;"></div>
-</div>
+<!-- ============ Dashboard ============ -->
+<section class="admin-section" id="section-dashboard">
+  <h2>Today's Orders</h2>
+  <p style="font-size:13px; color:var(--color-text-muted); margin-top:-8px;" id="dashboard-date"></p>
 
-<h2 style="margin-top: var(--space-5);" id="orders-section">Orders</h2>
-<div class="d-flex gap-2 mb-3 flex-wrap">
-  <input type="text" class="form-control" id="orderSearchInput" placeholder="Search by Order ID, email, name, amount..." style="flex:1; min-width:200px;">
-  <button class="btn btn-secondary" type="button" onclick="clearOrderSearch()">Clear</button>
-</div>
-<div id="order-list">
-  <div class="skeleton skeleton-line" style="height:60px;"></div>
-</div>
-
-<h2 style="margin-top: var(--space-5);" id="settings-section">Store Settings</h2>
-<form id="settings-form" class="surface-card">
-  <div class="form-field">
-    <label class="form-label" for="s-name">Store name</label>
-    <input type="text" class="form-control" id="s-name">
-  </div>
-  <div class="form-field">
-    <label class="form-label" for="s-address">Address</label>
-    <input type="text" class="form-control" id="s-address">
-  </div>
-  <div class="row g-2">
-    <div class="col-6 form-field">
-      <label class="form-label" for="s-gstin">GSTIN</label>
-      <input type="text" class="form-control" id="s-gstin">
+  <div class="stat-grid">
+    <div class="stat-card stat-total">
+      <div class="stat-label">Total</div>
+      <div class="stat-value" id="stat-total">0</div>
     </div>
-    <div class="col-6 form-field">
-      <label class="form-label" for="s-mobile">Mobile</label>
-      <input type="text" class="form-control" id="s-mobile">
+    <div class="stat-card stat-paid">
+      <div class="stat-label">Paid</div>
+      <div class="stat-value" id="stat-paid">₹0</div>
+    </div>
+    <div class="stat-card stat-unpaid">
+      <div class="stat-label">Unpaid</div>
+      <div class="stat-value" id="stat-unpaid">₹0</div>
+    </div>
+    <div class="stat-card stat-cancelled">
+      <div class="stat-label">Cancelled</div>
+      <div class="stat-value" id="stat-cancelled">₹0</div>
     </div>
   </div>
-  <div class="form-field">
-    <label class="form-label" for="s-email">Contact email</label>
-    <input type="email" class="form-control" id="s-email">
+  <p style="font-size:12px; color:var(--color-text-faint); margin-top:var(--space-3);">
+    Updates automatically every 30 seconds. "Paid" includes Confirmed, Shipped, and Delivered orders.
+  </p>
+</section>
+
+<!-- ============ Products ============ -->
+<section class="admin-section" id="section-products">
+  <h2>Add Product</h2>
+  <form id="add-form" class="surface-card">
+    <div class="form-field">
+      <label class="form-label" for="p-name">Product name</label>
+      <input type="text" class="form-control" id="p-name" required>
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="p-photo">Photo URL</label>
+      <input type="text" class="form-control" id="p-photo" required>
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="p-sizes">Sizes (JSON)</label>
+      <input type="text" class="form-control" id="p-sizes" placeholder='{"S":100,"M":120}' required>
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Add Product</button>
+  </form>
+  <div id="add-result" style="margin-top: var(--space-2);"></div>
+
+  <h2 style="margin-top: var(--space-5);">Products</h2>
+  <div id="product-list">
+    <div class="skeleton skeleton-line" style="height:60px;"></div>
   </div>
-  <button type="submit" class="btn btn-primary btn-block">Save Settings</button>
-</form>
-<div id="settings-result" style="margin-top: var(--space-2);"></div>
+</section>
+
+<!-- ============ Orders ============ -->
+<section class="admin-section" id="section-orders">
+  <h2>Orders</h2>
+  <div class="d-flex gap-2 mb-3 flex-wrap">
+    <input type="text" class="form-control" id="orderSearchInput" placeholder="Search by Order ID, email, name, amount..." style="flex:1; min-width:200px;">
+    <button class="btn btn-secondary" type="button" onclick="clearOrderSearch()">Clear</button>
+  </div>
+  <div id="order-list">
+    <div class="skeleton skeleton-line" style="height:60px;"></div>
+  </div>
+</section>
+
+<!-- ============ Settings ============ -->
+<section class="admin-section" id="section-settings">
+  <h2>Store Settings</h2>
+  <form id="settings-form" class="surface-card">
+    <div class="form-field">
+      <label class="form-label" for="s-name">Store name</label>
+      <input type="text" class="form-control" id="s-name">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="s-address">Address</label>
+      <input type="text" class="form-control" id="s-address">
+    </div>
+    <div class="row g-2">
+      <div class="col-6 form-field">
+        <label class="form-label" for="s-gstin">GSTIN</label>
+        <input type="text" class="form-control" id="s-gstin">
+      </div>
+      <div class="col-6 form-field">
+        <label class="form-label" for="s-mobile">Mobile</label>
+        <input type="text" class="form-control" id="s-mobile">
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="s-email">Contact email</label>
+      <input type="email" class="form-control" id="s-email">
+    </div>
+    <button type="submit" class="btn btn-primary btn-block">Save Settings</button>
+  </form>
+  <div id="settings-result" style="margin-top: var(--space-2);"></div>
+</section>
+
+<!-- ============ Help ============ -->
+<section class="admin-section" id="section-help">
+  <h2>Help</h2>
+  <div class="surface-card stack-md">
+    <div>
+      <strong>Adding a product</strong>
+      <p style="margin:0;">Fill in the name, a photo URL, and sizes as JSON, e.g. <code>{"S":100,"M":120}</code>.</p>
+    </div>
+    <div>
+      <strong>Managing orders</strong>
+      <p style="margin:0;">Click any order row to see full details. Use the status dropdown to update it as you process the order.</p>
+    </div>
+    <div>
+      <strong>Dashboard</strong>
+      <p style="margin:0;">Shows a live snapshot of today's orders, split into Paid, Unpaid, and Cancelled totals.</p>
+    </div>
+    <div>
+      <strong>Need more help?</strong>
+      <p style="margin:0;">Email <a href="mailto:{{ site.supportEmail }}">{{ site.supportEmail }}</a> or call {{ site.supportPhone }}.</p>
+    </div>
+  </div>
+</section>
 
 <!-- Edit Product Modal -->
 <div class="modal fade" id="editProductModal" tabindex="-1">
@@ -115,6 +176,30 @@ layout: admin-base.njk
   let allOrders = [];
   let editProductModalInstance, orderModalInstance;
 
+  // ---- Dashboard ----
+  window.loadDashboard = async function () {
+    document.getElementById("dashboard-date").textContent = new Date().toDateString();
+
+    const res = await fetch("/api/admin/orders");
+    const orders = await res.json();
+    if (!Array.isArray(orders)) return;
+
+    const today = new Date().toDateString();
+    const todayOrders = orders.filter(o => new Date(o.date).toDateString() === today);
+
+    const paidStatuses = ["CONFIRMED", "SHIPPED", "DELIVERED"];
+    const paidAmount = todayOrders.filter(o => paidStatuses.includes(o.status)).reduce((s, o) => s + o.amount, 0);
+    const unpaidAmount = todayOrders.filter(o => o.status === "UNPAID").reduce((s, o) => s + o.amount, 0);
+    const cancelledAmount = todayOrders.filter(o => o.status === "CANCELLED").reduce((s, o) => s + o.amount, 0);
+
+    document.getElementById("stat-total").textContent = todayOrders.length;
+    document.getElementById("stat-paid").textContent = "₹" + paidAmount.toLocaleString("en-IN");
+    document.getElementById("stat-unpaid").textContent = "₹" + unpaidAmount.toLocaleString("en-IN");
+    document.getElementById("stat-cancelled").textContent = "₹" + cancelledAmount.toLocaleString("en-IN");
+  };
+  setInterval(() => window.loadDashboard(), 30000);
+
+  // ---- Products ----
   async function loadProducts() {
     const res = await fetch("/api/admin/products");
     allProducts = await res.json();
@@ -243,6 +328,7 @@ layout: admin-base.njk
     }
   });
 
+  // ---- Orders ----
   async function loadOrders() {
     const res = await fetch("/api/admin/orders");
     allOrders = await res.json();

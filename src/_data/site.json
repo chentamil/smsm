@@ -1,11 +1,11 @@
 {
-  "siteName": "Maharaja Retail",
+  "siteName": "SMSM Store",
   "tagline": "Fresh picks, delivered to your door.",
-  "supportEmail": "info@achabazar.com",
-  "supportPhone": "+917373020972",
+  "supportEmail": "support@example.com",
+  "supportPhone": "+91 90000 00000",
   "footerNote": "Cash on delivery available on all orders.",
-  "upiId": "9994589034@sbi",
-  "upiPayeeName": "Maharaja Retail",
+  "upiId": "yourshop@upi",
+  "upiPayeeName": "SMSM Store",
   "nav": [
     { "label": "Home", "url": "/", "icon": "bi-house" },
     { "label": "Shop", "url": "/catalog/", "icon": "bi-shop" },
@@ -17,8 +17,9 @@
     { "label": "Track Order", "url": "/track/" }
   ],
   "adminNav": [
-    { "label": "Products", "url": "#products-section", "icon": "bi-box-seam" },
-    { "label": "Orders", "url": "#orders-section", "icon": "bi-receipt" },
-    { "label": "Settings", "url": "#settings-section", "icon": "bi-gear" }
+    { "label": "Dashboard", "section": "dashboard", "icon": "bi-speedometer2" },
+    { "label": "Products", "section": "products", "icon": "bi-box-seam" },
+    { "label": "Orders", "section": "orders", "icon": "bi-receipt" },
+    { "label": "Settings", "section": "settings", "icon": "bi-gear" }
   ]
 }
