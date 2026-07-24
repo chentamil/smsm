@@ -1,0 +1,17 @@
+<footer class="app-footer">
+  <div class="container-app">
+    <div class="footer-links">
+      {% for link in site.footerLinks %}
+        <a href="{{ link.url }}">{{ link.label }}</a>
+      {% endfor %}
+    </div>
+    <p class="footer-note">{{ site.footerNote }}</p>
+    <p class="footer-contact">
+      <i class="bi bi-envelope"></i> {{ site.supportEmail }}
+      &nbsp;·&nbsp;
+      <i class="bi bi-telephone"></i> {{ site.supportPhone }}
+    </p>
+    <p class="footer-copy">&copy; <span id="footer-year"></span> {{ site.siteName }}. All rights reserved.</p>
+  </div>
+</footer>
+<script>document.getElementById("footer-year").textContent = new Date().getFullYear();</script>

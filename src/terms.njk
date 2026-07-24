@@ -1,0 +1,29 @@
+---
+title: Terms & Conditions
+layout: base.njk
+---
+<h1>Terms & Conditions</h1>
+<p style="font-size:13px; color:var(--color-text-faint);">Last updated: <span id="updated-date"></span></p>
+
+<div class="surface-card stack-md">
+  <div>
+    <h3>Orders</h3>
+    <p>By placing an order on {{ site.siteName }}, you confirm that the delivery details provided are accurate. Orders are currently fulfilled on a cash-on-delivery basis unless stated otherwise at checkout.</p>
+  </div>
+  <div>
+    <h3>Pricing</h3>
+    <p>Prices shown at checkout are final at the time of order. {{ site.siteName }} reserves the right to correct pricing errors before an order is confirmed.</p>
+  </div>
+  <div>
+    <h3>Cancellations</h3>
+    <p>To cancel or modify an order, contact us at {{ site.supportEmail }} or {{ site.supportPhone }} as soon as possible after placing it.</p>
+  </div>
+  <div>
+    <h3>Limitation of Liability</h3>
+    <p>{{ site.siteName }} is not liable for delays caused by circumstances outside our reasonable control, including courier delays or incorrect delivery information provided at checkout.</p>
+  </div>
+</div>
+
+<script>
+  document.getElementById("updated-date").textContent = new Date().toLocaleDateString();
+</script>

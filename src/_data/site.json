@@ -1,0 +1,21 @@
+{
+  "siteName": "SMSM Store",
+  "tagline": "Fresh picks, delivered to your door.",
+  "supportEmail": "support@example.com",
+  "supportPhone": "+91 90000 00000",
+  "footerNote": "Cash on delivery available on all orders.",
+  "nav": [
+    { "label": "Home", "url": "/", "icon": "bi-house" },
+    { "label": "Shop", "url": "/catalog/", "icon": "bi-shop" },
+    { "label": "Track Order", "url": "/track/", "icon": "bi-box-seam" }
+  ],
+  "footerLinks": [
+    { "label": "Privacy Policy", "url": "/privacy/" },
+    { "label": "Terms & Conditions", "url": "/terms/" },
+    { "label": "Track Order", "url": "/track/" }
+  ],
+  "adminNav": [
+    { "label": "Products", "url": "#products-section", "icon": "bi-box-seam" },
+    { "label": "Orders", "url": "#orders-section", "icon": "bi-receipt" }
+  ]
+}

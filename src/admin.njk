@@ -2,11 +2,7 @@
 title: Admin Dashboard
 layout: admin-base.njk
 ---
-<div style="display:flex; justify-content:flex-end; margin-bottom: var(--space-3);">
-  <button class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
-</div>
-
-<h2>Add Product</h2>
+<h2 id="products-section">Add Product</h2>
 <form id="add-form" class="surface-card">
   <div class="form-field">
     <label class="form-label" for="p-name">Product name</label>
@@ -29,17 +25,12 @@ layout: admin-base.njk
   <div class="skeleton skeleton-line" style="height:60px;"></div>
 </div>
 
-<h2 style="margin-top: var(--space-5);">Orders</h2>
+<h2 style="margin-top: var(--space-5);" id="orders-section">Orders</h2>
 <div id="order-list">
   <div class="skeleton skeleton-line" style="height:60px;"></div>
 </div>
 
 <script>
-  async function logout() {
-    await fetch("/api/admin-logout", { method: "POST" });
-    window.location.href = "/admin-login/";
-  }
-
   async function loadProducts() {
     const res = await fetch("/api/admin/products");
     const products = await res.json();
@@ -59,7 +50,7 @@ layout: admin-base.njk
               <td data-label="Name">${p.name}</td>
               <td data-label="Photo"><span style="word-break:break-all; font-size:12px;">${p.photo}</span></td>
               <td data-label="Sizes">${JSON.stringify(p.sizes)}</td>
-              <td data-label="Actions"><button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})">Delete</button></td>
+              <td data-label="Actions"><button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="bi bi-trash"></i></button></td>
             </tr>
           `).join("")}
         </tbody>

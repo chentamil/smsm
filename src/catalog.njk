@@ -2,132 +2,218 @@
 title: Catalog
 layout: base.njk
 ---
-<h1>Our Products</h1>
+<div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+  <input type="text" class="form-control" id="searchInput" placeholder="Search products, sizes, price..." style="flex:1; min-width:200px;">
+  <select class="form-select" id="sortSelect" style="width:auto;">
+    <option value="">Sort</option>
+    <option value="low">Price: Low to High</option>
+    <option value="high">Price: High to Low</option>
+  </select>
+  <button class="btn btn-outline-primary btn-sm" type="button" onclick="openCartModal()">
+    <i class="bi bi-cart3"></i> View Cart
+  </button>
+</div>
 
-<div class="row g-3" id="catalog">
-  <!-- skeleton placeholders shown until products load -->
-  <div class="col-6 col-md-4 col-lg-3 skeleton-slot">
-    <div class="skeleton-card">
-      <div class="skeleton skeleton-img"></div>
-      <div class="skeleton skeleton-line" style="width: 70%;"></div>
-      <div class="skeleton skeleton-line" style="width: 40%;"></div>
-    </div>
+<div id="catalog">
+  <div class="skeleton-card" style="margin-bottom: var(--space-3);">
+    <div class="skeleton" style="height:110px; border-radius: var(--radius-md);"></div>
   </div>
-  <div class="col-6 col-md-4 col-lg-3 skeleton-slot">
-    <div class="skeleton-card">
-      <div class="skeleton skeleton-img"></div>
-      <div class="skeleton skeleton-line" style="width: 70%;"></div>
-      <div class="skeleton skeleton-line" style="width: 40%;"></div>
-    </div>
-  </div>
-  <div class="col-6 col-md-4 col-lg-3 skeleton-slot">
-    <div class="skeleton-card">
-      <div class="skeleton skeleton-img"></div>
-      <div class="skeleton skeleton-line" style="width: 70%;"></div>
-      <div class="skeleton skeleton-line" style="width: 40%;"></div>
-    </div>
+  <div class="skeleton-card" style="margin-bottom: var(--space-3);">
+    <div class="skeleton" style="height:110px; border-radius: var(--radius-md);"></div>
   </div>
 </div>
 
-<!-- Sticky cart bar - signature element, appears once something is added -->
-<div class="cart-bar" id="cart-bar">
-  <div class="cart-bar-info">
-    <strong id="cart-bar-total">₹0</strong>
-    <span id="cart-bar-count">0 items</span>
+<!-- Cart preview modal (Bootstrap modal - allowed per design brief) -->
+<div class="modal fade" id="cartModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cart3"></i> Your Cart</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="cartContent"></div>
+      <div class="modal-footer">
+        <a href="/cart/" class="btn btn-primary btn-block" id="checkoutBtn">Proceed to Checkout</a>
+      </div>
+    </div>
   </div>
-  <a href="/cart/" class="btn btn-accent">View Cart →</a>
 </div>
 
 <script>
-  function getCart() {
-    return JSON.parse(localStorage.getItem("cart") || "[]");
-  }
-  function saveCart(cart) {
-    localStorage.setItem("cart", JSON.stringify(cart));
-    document.dispatchEvent(new Event("cart:updated"));
-    refreshCartBar();
-  }
-  function refreshCartBar() {
-    const cart = getCart();
-    const bar = document.getElementById("cart-bar");
-    const count = cart.reduce((sum, i) => sum + i.qty, 0);
-    const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+  let products = [];
+  let filteredProducts = [];
+  let productMap = {};
+  let cart = JSON.parse(localStorage.getItem("cart") || "{}");
 
-    if (count > 0) {
-      bar.classList.add("visible");
-      document.getElementById("cart-bar-total").textContent = "₹" + total;
-      document.getElementById("cart-bar-count").textContent = count + (count === 1 ? " item" : " items");
-    } else {
-      bar.classList.remove("visible");
-    }
-  }
-  function addToCart(id, name, photo, size, price) {
-    const cart = getCart();
-    const existing = cart.find(i => i.id === id && i.size === size);
-    if (existing) {
-      existing.qty += 1;
-    } else {
-      cart.push({ id, name, photo, size, price, qty: 1 });
-    }
-    saveCart(cart);
-  }
+  const catalogEl = document.getElementById("catalog");
 
   async function loadCatalog() {
-    const el = document.getElementById("catalog");
     try {
       const res = await fetch("/api/products");
-      const products = await res.json();
+      products = await res.json();
+      filteredProducts = products;
+      productMap = {};
+      products.forEach(p => productMap[p.id] = p);
 
       if (!Array.isArray(products) || products.length === 0) {
-        el.innerHTML = `
-          <div class="col-12">
-            <div class="empty-state">
-              <div class="empty-icon">🛍️</div>
-              <p>No products here yet. Check back soon.</p>
-            </div>
+        catalogEl.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon"><i class="bi bi-shop"></i></div>
+            <p>No products here yet. Check back soon.</p>
           </div>`;
         return;
       }
 
-      el.innerHTML = products.map(p => {
-        const sizeOptions = Object.entries(p.sizes)
-          .map(([size, price]) => `<option value="${size}" data-price="${price}">${size} · ₹${price}</option>`)
-          .join("");
-
-        return `
-          <div class="col-6 col-md-4 col-lg-3">
-            <div class="product-card">
-              <div class="product-img-wrap">
-                <img src="${p.photo}" alt="${p.name}" loading="lazy">
-              </div>
-              <div class="product-body">
-                <h3 class="product-name">${p.name}</h3>
-                <select class="form-select form-select-sm" id="size-${p.id}">${sizeOptions}</select>
-                <button class="btn btn-primary btn-sm btn-block" onclick="addFromCard(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${p.photo}')">
-                  Add to cart
-                </button>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join("");
-
+      renderCatalog();
+      restoreCart();
     } catch (err) {
-      el.innerHTML = `
-        <div class="col-12">
-          <div class="alert alert-danger" role="alert">Could not load products. Please refresh.</div>
-        </div>`;
+      catalogEl.innerHTML = `<div class="alert alert-danger">Could not load products. Please refresh.</div>`;
       console.error(err);
     }
   }
 
-  function addFromCard(id, name, photo) {
-    const select = document.getElementById("size-" + id);
-    const size = select.value;
-    const price = Number(select.selectedOptions[0].dataset.price);
-    addToCart(id, name, photo, size, price);
+  function renderCatalog() {
+    catalogEl.innerHTML = filteredProducts.map(p => `
+      <div class="product-row">
+        <div class="product-row-img">
+          <img src="${p.photo}" alt="${p.name}" loading="lazy"
+               onerror="this.src='https://placehold.co/200x200?text=No+Image'">
+        </div>
+        <div class="product-row-body">
+          <h3 class="product-row-name">${p.name}</h3>
+          <div class="product-row-price">Selected: ₹<span id="price_${p.id}">0</span></div>
+          ${Object.entries(p.sizes).map(([size, price]) => `
+            <div class="size-row">
+              <span class="size-label">${size} (₹${price})</span>
+              <div class="qty-stepper">
+                <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',-1)">−</button>
+                <input type="number" class="form-control qty-input" id="qty_${p.id}_${size}" value="0" min="0"
+                       oninput="manualQty(${p.id},'${size}')">
+                <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',1)">+</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `).join("");
   }
 
-  refreshCartBar();
+  function changeQty(id, size, delta) {
+    const el = document.getElementById(`qty_${id}_${size}`);
+    el.value = Math.max(0, Number(el.value) + delta);
+    updateCart(id, size);
+  }
+
+  function manualQty(id, size) {
+    const el = document.getElementById(`qty_${id}_${size}`);
+    if (el.value < 0) el.value = 0;
+    updateCart(id, size);
+  }
+
+  function updateCart(id, size) {
+    const qty = Number(document.getElementById(`qty_${id}_${size}`).value);
+    const key = `${id}-${size}`;
+    const product = productMap[id];
+    const price = product.sizes[size];
+
+    if (qty > 0) {
+      cart[key] = { product: { id: product.id, name: product.name, photo: product.photo }, size, qty, price };
+    } else {
+      delete cart[key];
+    }
+
+    localStorage.setItem("cart", JSON.stringify(cart));
+    document.dispatchEvent(new Event("cart:updated"));
+    updateCatalogPrice(id);
+  }
+
+  function restoreCart() {
+    Object.entries(cart).forEach(([key, c]) => {
+      const el = document.getElementById(`qty_${c.product.id}_${c.size}`);
+      if (el) el.value = c.qty;
+      updateCatalogPrice(c.product.id);
+    });
+    document.dispatchEvent(new Event("cart:updated"));
+  }
+
+  function updateCatalogPrice(id) {
+    const p = productMap[id];
+    let total = 0;
+    Object.keys(p.sizes).forEach(s => {
+      const key = `${id}-${s}`;
+      if (cart[key]) total += cart[key].qty * cart[key].price;
+    });
+    const priceEl = document.getElementById(`price_${id}`);
+    if (priceEl) priceEl.textContent = total.toLocaleString("en-IN");
+  }
+
+  // ---- Cart modal ----
+  let cartModalInstance;
+
+  function openCartModal() {
+    const cartContent = document.getElementById("cartContent");
+
+    if (Object.keys(cart).length === 0) {
+      cartContent.innerHTML = `<div class="empty-state"><div class="empty-icon"><i class="bi bi-cart"></i></div><p>Your cart is empty.</p></div>`;
+    } else {
+      let grandTotal = 0;
+      cartContent.innerHTML = Object.entries(cart).map(([key, c]) => {
+        grandTotal += c.price * c.qty;
+        return `
+          <div class="d-flex justify-content-between align-items-center py-2" style="border-bottom:1px solid var(--color-border);">
+            <div>
+              <div style="font-weight:600; font-size:14px;">${c.product.name}</div>
+              <div style="font-size:12px; color:var(--color-text-muted);">${c.size} · Qty ${c.qty} · ₹${c.price * c.qty}</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="deleteItem('${key}')"><i class="bi bi-trash"></i></button>
+          </div>`;
+      }).join("") + `
+        <div class="d-flex justify-content-between align-items-center pt-3">
+          <strong>Grand Total</strong>
+          <strong>₹${grandTotal}</strong>
+        </div>`;
+    }
+
+    const modalEl = document.getElementById("cartModal");
+    if (!cartModalInstance) cartModalInstance = new bootstrap.Modal(modalEl);
+    cartModalInstance.show();
+  }
+
+  function deleteItem(key) {
+    const [id, size] = key.split("-");
+    const el = document.getElementById(`qty_${id}_${size}`);
+    if (el) el.value = 0;
+    updateCart(Number(id), size);
+    openCartModal();
+  }
+
+  // ---- Search ----
+  let searchTimeout;
+  document.getElementById("searchInput").addEventListener("input", function () {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+      const query = this.value.toLowerCase();
+      filteredProducts = products.filter(p =>
+        p.name.toLowerCase().includes(query) ||
+        Object.keys(p.sizes).some(s => s.toLowerCase().includes(query)) ||
+        Object.values(p.sizes).some(price => price.toString().includes(query))
+      );
+      renderCatalog();
+      restoreCart();
+    }, 300);
+  });
+
+  // ---- Sort ----
+  document.getElementById("sortSelect").addEventListener("change", function () {
+    if (this.value === "low") filteredProducts.sort((a, b) => getMinPrice(a) - getMinPrice(b));
+    if (this.value === "high") filteredProducts.sort((a, b) => getMinPrice(b) - getMinPrice(a));
+    renderCatalog();
+    restoreCart();
+  });
+
+  function getMinPrice(product) {
+    return Math.min(...Object.values(product.sizes));
+  }
+
   loadCatalog();
 </script>

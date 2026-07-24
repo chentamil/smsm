@@ -13,6 +13,25 @@ export async function onRequestPost(context) {
   }
 
   const body = await request.json();
+
+  // --- Turnstile verification (second layer of brute-force protection) ---
+  if (!env.TURNSTILE_SECRET_KEY) {
+    return json({ error: "TURNSTILE_SECRET_KEY not configured on server" }, 500);
+  }
+  if (!body.turnstileToken) {
+    return json({ error: "Captcha verification missing" }, 400);
+  }
+
+  const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ secret: env.TURNSTILE_SECRET_KEY, response: body.turnstileToken, remoteip: ip })
+  });
+  const verifyData = await verifyRes.json();
+  if (!verifyData.success) {
+    return json({ error: "Captcha verification failed" }, 400);
+  }
+
   if (body.password !== env.ADMIN_PASSWORD) {
     return json({ error: "Wrong password" }, 401);
   }

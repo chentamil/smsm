@@ -4,29 +4,41 @@ layout: admin-base.njk
 ---
 <div style="max-width: 360px; margin: var(--space-6) auto 0;">
   <div class="surface-card text-center">
-    <div style="font-size: 30px; margin-bottom: var(--space-2);">🔐</div>
+    <div style="font-size: 30px; margin-bottom: var(--space-2);"><i class="bi bi-shield-lock"></i></div>
     <h2>Admin Login</h2>
     <form id="login-form" class="stack-md" style="text-align:left;">
       <div class="form-field">
         <label class="form-label" for="password">Password</label>
         <input type="password" class="form-control" id="password" required autofocus>
       </div>
+
+      <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
+      <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1"></div>
+
       <button type="submit" class="btn btn-primary btn-block">Login</button>
     </form>
     <div id="login-result" style="margin-top: var(--space-3);"></div>
   </div>
 </div>
 
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+
 <script>
   document.getElementById("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const password = document.getElementById("password").value;
+    const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
     const resultEl = document.getElementById("login-result");
+
+    if (!turnstileToken) {
+      resultEl.innerHTML = `<div class="alert alert-warning">Please complete the captcha check.</div>`;
+      return;
+    }
 
     const res = await fetch("/api/admin-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password })
+      body: JSON.stringify({ password, turnstileToken })
     });
     const data = await res.json();
 
@@ -34,6 +46,7 @@ layout: admin-base.njk
       window.location.href = "/admin/";
     } else {
       resultEl.innerHTML = `<div class="alert alert-danger">${data.error || "Login failed"}</div>`;
+      if (window.turnstile) turnstile.reset();
     }
   });
 </script>

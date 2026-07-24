@@ -35,10 +35,14 @@ layout: base.njk
     </div>
   </div>
 
+  <!-- Honeypot - hidden from real users, bots tend to fill every field -->
+  <input type="text" id="website" name="website" autocomplete="off" tabindex="-1"
+         style="position:absolute; left:-9999px; width:1px; height:1px;" aria-hidden="true">
+
   <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
   <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1" style="margin: var(--space-3) 0;"></div>
 
-  <button type="submit" class="btn btn-primary btn-block">Place Order (Cash on Delivery)</button>
+  <button type="submit" class="btn btn-primary btn-block" id="placeOrderBtn">Place Order (Cash on Delivery)</button>
 </form>
 
 <div id="order-result" style="margin-top: var(--space-3);"></div>
@@ -61,22 +65,33 @@ layout: base.njk
 </style>
 
 <script>
+  // Cart is stored as an object keyed "${id}-${size}" -> {product, size, qty, price}
+  // (matches the catalog page's model)
   function getCart() {
-    return JSON.parse(localStorage.getItem("cart") || "[]");
+    return JSON.parse(localStorage.getItem("cart") || "{}");
   }
   function saveCart(cart) {
     localStorage.setItem("cart", JSON.stringify(cart));
     document.dispatchEvent(new Event("cart:updated"));
   }
+  function cartAsItemsArray(cart) {
+    return Object.values(cart).map(c => ({
+      name: c.product.name,
+      size: c.size,
+      price: c.price,
+      qty: c.qty
+    }));
+  }
 
   function renderCart() {
     const cart = getCart();
     const el = document.getElementById("cart-items");
+    const keys = Object.keys(cart);
 
-    if (cart.length === 0) {
+    if (keys.length === 0) {
       el.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🛒</div>
+          <div class="empty-icon"><i class="bi bi-cart"></i></div>
           <p>Your cart is empty.</p>
           <a href="/catalog/" class="btn btn-outline-primary btn-sm">Browse products</a>
         </div>`;
@@ -84,23 +99,25 @@ layout: base.njk
       return;
     }
 
-    el.innerHTML = cart.map((item, idx) => `
-      <div class="cart-row">
-        <div>
-          <div class="cart-row-name">${item.name}</div>
-          <div class="cart-row-meta">${item.size} · Qty ${item.qty} · ₹${item.price * item.qty}</div>
-        </div>
-        <button class="btn btn-secondary btn-sm" onclick="removeItem(${idx})">Remove</button>
-      </div>
-    `).join("");
+    el.innerHTML = keys.map(key => {
+      const c = cart[key];
+      return `
+        <div class="cart-row">
+          <div>
+            <div class="cart-row-name">${c.product.name}</div>
+            <div class="cart-row-meta">${c.size} · Qty ${c.qty} · ₹${c.price * c.qty}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="removeItem('${key}')"><i class="bi bi-trash"></i></button>
+        </div>`;
+    }).join("");
 
-    const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+    const total = Object.values(cart).reduce((sum, c) => sum + (c.price * c.qty), 0);
     document.getElementById("cart-total").textContent = total;
   }
 
-  function removeItem(idx) {
+  function removeItem(key) {
     const cart = getCart();
-    cart.splice(idx, 1);
+    delete cart[key];
     saveCart(cart);
     renderCart();
   }
@@ -109,10 +126,13 @@ layout: base.njk
     e.preventDefault();
 
     const cart = getCart();
-    if (cart.length === 0) {
+    if (Object.keys(cart).length === 0) {
       alert("Your cart is empty.");
       return;
     }
+
+    // Honeypot check - if this hidden field got filled, silently bail
+    if (document.getElementById("website").value !== "") return;
 
     const turnstileToken = document.querySelector('[name="cf-turnstile-response"]')?.value;
     if (!turnstileToken) {
@@ -128,14 +148,17 @@ layout: base.njk
       state: document.getElementById("c-state").value
     };
 
+    const btn = document.getElementById("placeOrderBtn");
     const resultEl = document.getElementById("order-result");
+    btn.disabled = true;
+    btn.textContent = "Processing...";
     resultEl.innerHTML = `<div class="alert alert-info">Placing order...</div>`;
 
     try {
       const res = await fetch("/api/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, items: cart, turnstileToken })
+        body: JSON.stringify({ customer, items: cartAsItemsArray(cart), turnstileToken })
       });
       const data = await res.json();
 
@@ -147,10 +170,14 @@ layout: base.njk
         document.getElementById("checkout-form").style.display = "none";
       } else {
         resultEl.innerHTML = `<div class="alert alert-danger">Order failed: ${data.error || "unknown error"}</div>`;
+        btn.disabled = false;
+        btn.textContent = "Place Order (Cash on Delivery)";
       }
     } catch (err) {
       resultEl.innerHTML = `<div class="alert alert-danger">Order failed. Check console.</div>`;
       console.error(err);
+      btn.disabled = false;
+      btn.textContent = "Place Order (Cash on Delivery)";
     }
   });
 
