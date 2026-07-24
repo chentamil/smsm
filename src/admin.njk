@@ -40,8 +40,16 @@ layout: admin-base.njk
       <input type="text" class="form-control" id="p-name" required>
     </div>
     <div class="form-field">
-      <label class="form-label" for="p-photo">Photo URL</label>
-      <input type="text" class="form-control" id="p-photo" required>
+      <label class="form-label" for="p-photo1">Photo URL 1 (main image)</label>
+      <input type="text" class="form-control" id="p-photo1" required>
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="p-photo2">Photo URL 2 (optional)</label>
+      <input type="text" class="form-control" id="p-photo2">
+    </div>
+    <div class="form-field">
+      <label class="form-label" for="p-photo3">Photo URL 3 (optional)</label>
+      <input type="text" class="form-control" id="p-photo3">
     </div>
     <div class="form-field">
       <label class="form-label" for="p-sizes">Sizes (JSON)</label>
@@ -52,6 +60,10 @@ layout: admin-base.njk
   <div id="add-result" style="margin-top: var(--space-2);"></div>
 
   <h2 style="margin-top: var(--space-5);">Products</h2>
+  <div class="bulk-actions-bar" id="products-bulk-bar">
+    <span id="products-selected-count">0 selected</span>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelectedProducts()"><i class="bi bi-trash"></i> Delete Selected</button>
+  </div>
   <div id="product-list">
     <div class="skeleton skeleton-line" style="height:60px;"></div>
   </div>
@@ -63,6 +75,10 @@ layout: admin-base.njk
   <div class="d-flex gap-2 mb-3 flex-wrap">
     <input type="text" class="form-control" id="orderSearchInput" placeholder="Search by Order ID, email, name, amount..." style="flex:1; min-width:200px;">
     <button class="btn btn-secondary" type="button" onclick="clearOrderSearch()">Clear</button>
+  </div>
+  <div class="bulk-actions-bar" id="orders-bulk-bar">
+    <span id="orders-selected-count">0 selected</span>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelectedOrders()"><i class="bi bi-trash"></i> Delete Selected</button>
   </div>
   <div id="order-list">
     <div class="skeleton skeleton-line" style="height:60px;"></div>
@@ -138,8 +154,16 @@ layout: admin-base.njk
           <input type="text" class="form-control" id="edit-p-name" placeholder="e.g. Colgate Salt">
         </div>
         <div class="form-field">
-          <label class="form-label" for="edit-p-photo">Photo URL</label>
-          <input type="text" class="form-control" id="edit-p-photo" placeholder="https://...">
+          <label class="form-label" for="edit-p-photo1">Photo URL 1 (main image)</label>
+          <input type="text" class="form-control" id="edit-p-photo1" placeholder="https://...">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="edit-p-photo2">Photo URL 2 (optional)</label>
+          <input type="text" class="form-control" id="edit-p-photo2" placeholder="https://...">
+        </div>
+        <div class="form-field">
+          <label class="form-label" for="edit-p-photo3">Photo URL 3 (optional)</label>
+          <input type="text" class="form-control" id="edit-p-photo3" placeholder="https://...">
         </div>
         <div class="form-field">
           <label class="form-label" for="edit-p-sizes">Sizes (JSON)</label>
@@ -212,11 +236,15 @@ layout: admin-base.njk
 
     el.innerHTML = `
       <table class="table-app">
-        <thead><tr><th>Image</th><th>Name</th><th>Sizes</th><th>Actions</th></tr></thead>
+        <thead><tr>
+          <th><input type="checkbox" class="select-checkbox" onchange="toggleAllProducts(this.checked)"></th>
+          <th>Image</th><th>Name</th><th>Sizes</th><th>Actions</th>
+        </tr></thead>
         <tbody>
           ${allProducts.map(p => `
             <tr>
-              <td data-label="Image"><img class="product-thumb" src="${p.photo}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=No+Image'"></td>
+              <td data-label="Select"><input type="checkbox" class="select-checkbox product-checkbox" value="${p.id}" onchange="updateProductsBulkBar()"></td>
+              <td data-label="Image"><img class="product-thumb" src="${(p.photos && p.photos[0]) || ''}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=No+Image'"></td>
               <td data-label="Name">${p.name}</td>
               <td data-label="Sizes">${JSON.stringify(p.sizes)}</td>
               <td data-label="Actions">
@@ -228,14 +256,43 @@ layout: admin-base.njk
         </tbody>
       </table>
     `;
+    updateProductsBulkBar();
+  }
+
+  function toggleAllProducts(checked) {
+    document.querySelectorAll(".product-checkbox").forEach(cb => cb.checked = checked);
+    updateProductsBulkBar();
+  }
+
+  function updateProductsBulkBar() {
+    const checked = document.querySelectorAll(".product-checkbox:checked");
+    const bar = document.getElementById("products-bulk-bar");
+    document.getElementById("products-selected-count").textContent = checked.length + " selected";
+    bar.classList.toggle("visible", checked.length > 0);
+  }
+
+  async function deleteSelectedProducts() {
+    const ids = [...document.querySelectorAll(".product-checkbox:checked")].map(cb => Number(cb.value));
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} selected product(s)?`)) return;
+
+    await fetch("/api/admin/products", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids })
+    });
+    loadProducts();
   }
 
   function openEditProduct(id) {
     const p = allProducts.find(x => x.id === id);
     if (!p) return;
+    const photos = p.photos || [];
     document.getElementById("edit-p-id").value = p.id;
     document.getElementById("edit-p-name").value = p.name;
-    document.getElementById("edit-p-photo").value = p.photo;
+    document.getElementById("edit-p-photo1").value = photos[0] || "";
+    document.getElementById("edit-p-photo2").value = photos[1] || "";
+    document.getElementById("edit-p-photo3").value = photos[2] || "";
     document.getElementById("edit-p-sizes").value = JSON.stringify(p.sizes);
     document.getElementById("edit-p-result").innerHTML = "";
 
@@ -254,13 +311,19 @@ layout: admin-base.njk
       return;
     }
 
+    const photos = [
+      document.getElementById("edit-p-photo1").value,
+      document.getElementById("edit-p-photo2").value,
+      document.getElementById("edit-p-photo3").value
+    ].filter(Boolean);
+
     const res = await fetch("/api/admin/products", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: Number(document.getElementById("edit-p-id").value),
         name: document.getElementById("edit-p-name").value,
-        photo: document.getElementById("edit-p-photo").value,
+        photos,
         sizes
       })
     });
@@ -308,12 +371,18 @@ layout: admin-base.njk
       return;
     }
 
+    const photos = [
+      document.getElementById("p-photo1").value,
+      document.getElementById("p-photo2").value,
+      document.getElementById("p-photo3").value
+    ].filter(Boolean);
+
     const res = await fetch("/api/admin/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: document.getElementById("p-name").value,
-        photo: document.getElementById("p-photo").value,
+        photos,
         sizes
       })
     });
@@ -335,7 +404,10 @@ layout: admin-base.njk
     renderOrdersTable(allOrders);
   }
 
+  let lastOrdersView = [];
+
   function renderOrdersTable(orders) {
+    lastOrdersView = orders;
     const el = document.getElementById("order-list");
     const statuses = ["UNPAID", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"];
 
@@ -346,10 +418,14 @@ layout: admin-base.njk
 
     el.innerHTML = `
       <table class="table-app">
-        <thead><tr><th>Order ID</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+        <thead><tr>
+          <th><input type="checkbox" class="select-checkbox" onchange="toggleAllOrders(this.checked)"></th>
+          <th>Order ID</th><th>Customer</th><th>Amount</th><th>Status</th><th>Date</th>
+        </tr></thead>
         <tbody>
           ${orders.map(o => `
             <tr>
+              <td data-label="Select"><input type="checkbox" class="select-checkbox order-checkbox" value="${o.order_id}" onchange="updateOrdersBulkBar()"></td>
               <td data-label="Order ID" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">${o.order_id}</td>
               <td data-label="Customer" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">${o.customer.name}<br><span style="font-size:12px; color:var(--color-text-muted);">${o.customer.email}</span></td>
               <td data-label="Amount" class="order-row-clickable" onclick="openOrderModal('${o.order_id}')">₹${o.amount}</td>
@@ -364,6 +440,32 @@ layout: admin-base.njk
         </tbody>
       </table>
     `;
+    updateOrdersBulkBar();
+  }
+
+  function toggleAllOrders(checked) {
+    document.querySelectorAll(".order-checkbox").forEach(cb => cb.checked = checked);
+    updateOrdersBulkBar();
+  }
+
+  function updateOrdersBulkBar() {
+    const checked = document.querySelectorAll(".order-checkbox:checked");
+    const bar = document.getElementById("orders-bulk-bar");
+    document.getElementById("orders-selected-count").textContent = checked.length + " selected";
+    bar.classList.toggle("visible", checked.length > 0);
+  }
+
+  async function deleteSelectedOrders() {
+    const ids = [...document.querySelectorAll(".order-checkbox:checked")].map(cb => cb.value);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} selected order(s)? This cannot be undone.`)) return;
+
+    await fetch("/api/admin/orders", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids })
+    });
+    loadOrders();
   }
 
   function openOrderModal(orderId) {
@@ -384,7 +486,12 @@ layout: admin-base.njk
       <p style="margin:0;">Email: ${o.customer.email}</p>
       <p style="margin:0;">Address: ${o.customer.address}, ${o.customer.city}, ${o.customer.state}</p>
       <p style="margin:0 0 var(--space-2);">Date: ${new Date(o.date).toLocaleString()}</p>
-      <p style="margin-bottom: var(--space-3);">Status: <span class="badge" data-status="${o.status}">${o.status}</span></p>
+      <p style="margin-bottom: var(--space-3); display:flex; align-items:center; gap: var(--space-2);">
+        Status:
+        <select class="form-select form-select-sm" style="width:auto;" id="modal-status-select" onchange="updateStatusFromModal('${o.order_id}', this.value)">
+          ${["UNPAID","CONFIRMED","SHIPPED","DELIVERED","CANCELLED"].map(s => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s}</option>`).join("")}
+        </select>
+      </p>
       <p style="margin-bottom: var(--space-1);"><strong>Items:</strong></p>
       <table class="table-app">
         <thead><tr><th>Product</th><th>Size</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
@@ -406,6 +513,11 @@ layout: admin-base.njk
     });
     const o = allOrders.find(x => x.order_id === orderId);
     if (o) o.status = status;
+  }
+
+  async function updateStatusFromModal(orderId, status) {
+    await updateStatus(orderId, status);
+    renderOrdersTable(lastOrdersView);
   }
 
   document.getElementById("orderSearchInput").addEventListener("input", function () {

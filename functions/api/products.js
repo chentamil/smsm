@@ -5,13 +5,13 @@ export async function onRequestGet(context) {
 
   try {
     const { results } = await env.DB.prepare(
-      "SELECT id, name, photo, sizes_json FROM products WHERE tenant_id = ?"
+      "SELECT id, name, photo, photos_json, sizes_json FROM products WHERE tenant_id = ?"
     ).bind(tenantId).all();
 
     const products = results.map(p => ({
       id: p.id,
       name: p.name,
-      photo: p.photo,
+      photos: parsePhotos(p.photo, p.photos_json),
       sizes: JSON.parse(p.sizes_json)
     }));
 
@@ -24,4 +24,18 @@ export async function onRequestGet(context) {
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
+}
+
+// Falls back to the single legacy `photo` column for products created
+// before multi-image support was added.
+function parsePhotos(photo, photosJson) {
+  if (photosJson) {
+    try {
+      const arr = JSON.parse(photosJson);
+      if (Array.isArray(arr) && arr.length > 0) return arr.filter(Boolean);
+    } catch {
+      // fall through to legacy photo
+    }
+  }
+  return photo ? [photo] : [];
 }

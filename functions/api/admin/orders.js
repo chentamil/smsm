@@ -41,6 +41,25 @@ export async function onRequestPatch(context) {
   }
 }
 
+export async function onRequestDelete(context) {
+  const { request, env } = context;
+  try {
+    const body = await request.json();
+    const ids = Array.isArray(body.ids) ? body.ids : (body.order_id ? [body.order_id] : []);
+
+    if (ids.length === 0) return json({ error: "order_id or ids required" }, 400);
+
+    const statements = ids.map(id =>
+      env.DB.prepare("DELETE FROM orders WHERE order_id = ? AND tenant_id = ?").bind(id, tenantId)
+    );
+    await env.DB.batch(statements);
+
+    return json({ success: true, deleted: ids.length });
+  } catch (err) {
+    return json({ error: err.message }, 500);
+  }
+}
+
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
     status,

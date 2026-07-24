@@ -64,19 +64,25 @@ layout: base.njk
 <script type="module">
   import PhotoSwipeLightbox from 'https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe-lightbox.esm.js';
 
-  // Note: each product currently has a single photo. This gallery is wired
-  // up so that adding more photos per product later (photo1/photo2/photo3)
-  // just means rendering more .pswp-gallery-item anchors per card - the
-  // lightbox/swipe behavior already works across however many are present.
-  window.initPhotoSwipe = function () {
-    if (window._pswpLightbox) window._pswpLightbox.destroy();
-    const lightbox = new PhotoSwipeLightbox({
-      gallery: '#catalog',
-      children: '.pswp-gallery-item',
-      pswpModule: () => import('https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe.esm.js')
+  // One scoped lightbox instance per product, so zooming into a product's
+  // photos never lets you swipe into a different product's images.
+  let lightboxInstances = [];
+
+  window.initPhotoSwipe = function (productIds) {
+    lightboxInstances.forEach(lb => lb.destroy());
+    lightboxInstances = [];
+
+    productIds.forEach(id => {
+      const el = document.getElementById(`gallery-${id}`);
+      if (!el) return;
+      const lightbox = new PhotoSwipeLightbox({
+        gallery: `#gallery-${id}`,
+        children: '.pswp-gallery-item',
+        pswpModule: () => import('https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe.esm.js')
+      });
+      lightbox.init();
+      lightboxInstances.push(lightbox);
     });
-    lightbox.init();
-    window._pswpLightbox = lightbox;
   };
 </script>
 
@@ -115,16 +121,60 @@ layout: base.njk
     }
   }
 
+  function buildGallery(p) {
+    const photos = (p.photos && p.photos.length > 0) ? p.photos : ['https://placehold.co/600x600?text=No+Image'];
+    const multi = photos.length > 1;
+
+    const slides = photos.map(photo => `
+      <div class="gallery-slide">
+        <a href="${photo}" class="pswp-gallery-item" target="_blank" rel="noopener">
+          <img src="${photo}" alt="${p.name}" loading="lazy"
+               onerror="this.src='https://placehold.co/600x600?text=No+Image'">
+        </a>
+      </div>
+    `).join("");
+
+    const dots = multi ? `
+      <div class="gallery-dots" id="dots-${p.id}">
+        ${photos.map((_, i) => `<span class="dot ${i === 0 ? "active" : ""}"></span>`).join("")}
+      </div>
+    ` : "";
+
+    const arrows = multi ? `
+      <button type="button" class="gallery-arrow prev" onclick="scrollGallery(${p.id}, -1)" aria-label="Previous photo">‹</button>
+      <button type="button" class="gallery-arrow next" onclick="scrollGallery(${p.id}, 1)" aria-label="Next photo">›</button>
+    ` : "";
+
+    return `
+      <div class="gallery-wrap">
+        <div class="gallery-track" id="gallery-${p.id}" ${multi ? `onscroll="onGalleryScroll(${p.id})"` : ""}>
+          ${slides}
+        </div>
+        ${dots}
+        ${arrows}
+      </div>
+    `;
+  }
+
+  function scrollGallery(id, direction) {
+    const track = document.getElementById(`gallery-${id}`);
+    if (!track) return;
+    track.scrollBy({ left: direction * track.clientWidth, behavior: "smooth" });
+  }
+
+  function onGalleryScroll(id) {
+    const track = document.getElementById(`gallery-${id}`);
+    const dotsEl = document.getElementById(`dots-${id}`);
+    if (!track || !dotsEl) return;
+    const index = Math.round(track.scrollLeft / track.clientWidth);
+    [...dotsEl.children].forEach((dot, i) => dot.classList.toggle("active", i === index));
+  }
+
   function renderCatalog() {
     catalogEl.innerHTML = filteredProducts.map(p => `
       <div class="col-12 col-md-4 mb-4">
         <div class="product-card">
-          <div class="product-img-wrap">
-            <a href="${p.photo}" class="pswp-gallery-item" target="_blank" rel="noopener">
-              <img src="${p.photo}" alt="${p.name}" loading="lazy"
-                   onerror="this.src='https://placehold.co/600x600?text=No+Image'">
-            </a>
-          </div>
+          ${buildGallery(p)}
           <div class="product-body">
             <h3 class="product-name">${p.name}</h3>
             <div style="font-size:13px; color:var(--color-text-muted);">Selected: ₹<span id="price_${p.id}">0</span></div>
@@ -144,7 +194,7 @@ layout: base.njk
       </div>
     `).join("");
 
-    if (window.initPhotoSwipe) window.initPhotoSwipe();
+    if (window.initPhotoSwipe) window.initPhotoSwipe(filteredProducts.map(p => p.id));
   }
 
   function changeQty(id, size, delta) {
@@ -166,7 +216,7 @@ layout: base.njk
     const price = product.sizes[size];
 
     if (qty > 0) {
-      cart[key] = { product: { id: product.id, name: product.name, photo: product.photo }, size, qty, price };
+      cart[key] = { product: { id: product.id, name: product.name, photo: (product.photos && product.photos[0]) || "" }, size, qty, price };
     } else {
       delete cart[key];
     }
