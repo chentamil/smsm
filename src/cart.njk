@@ -21,6 +21,10 @@ layout: base.njk
     <input type="email" class="form-control" id="c-email" required>
   </div>
   <div class="form-field">
+    <label class="form-label" for="c-phone">Phone (with country code, e.g. 91XXXXXXXXXX)</label>
+    <input type="tel" class="form-control" id="c-phone" required>
+  </div>
+  <div class="form-field">
     <label class="form-label" for="c-address">Address</label>
     <input type="text" class="form-control" id="c-address" required>
   </div>
@@ -40,7 +44,7 @@ layout: base.njk
          style="position:absolute; left:-9999px; width:1px; height:1px;" aria-hidden="true">
 
   <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
-  <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1" style="margin: var(--space-3) 0;"></div>
+  <div class="cf-turnstile" data-sitekey="YOUR_TURNSTILE_SITE_KEY" style="margin: var(--space-3) 0;"></div>
 
   <button type="submit" class="btn btn-primary btn-block" id="placeOrderBtn">Place Order (Cash on Delivery)</button>
 </form>
@@ -143,6 +147,7 @@ layout: base.njk
     const customer = {
       name: document.getElementById("c-name").value,
       email: document.getElementById("c-email").value,
+      phone: document.getElementById("c-phone").value,
       address: document.getElementById("c-address").value,
       city: document.getElementById("c-city").value,
       state: document.getElementById("c-state").value

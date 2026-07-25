@@ -1,7 +1,7 @@
 // /api/admin/products
 // GET    -> list all products
-// POST   -> create a product   { name, photos: ["url1","url2","url3"], sizes: {S:100,M:120} }
-// PUT    -> update a product   { id, name, photos, sizes }
+// POST   -> create a product   { name, photos: ["url1","url2","url3"], sizes: {S:100,M:120}, category }
+// PUT    -> update a product   { id, name, photos, sizes, category }
 // DELETE -> delete product(s)  { id } for one, or { ids: [1,2,3] } for bulk
 const tenantId = "default"; // phase 6 will read this from Host header
 
@@ -9,14 +9,15 @@ export async function onRequestGet(context) {
   const { env } = context;
   try {
     const { results } = await env.DB.prepare(
-      "SELECT id, name, photo, photos_json, sizes_json FROM products WHERE tenant_id = ?"
+      "SELECT id, name, photo, photos_json, sizes_json, category FROM products WHERE tenant_id = ?"
     ).bind(tenantId).all();
 
     const products = results.map(p => ({
       id: p.id,
       name: p.name,
       photos: parsePhotos(p.photo, p.photos_json),
-      sizes: JSON.parse(p.sizes_json)
+      sizes: JSON.parse(p.sizes_json),
+      category: p.category || "General"
     }));
 
     return json(products);
@@ -33,10 +34,11 @@ export async function onRequestPost(context) {
 
     const photos = (body.photos || []).filter(Boolean);
     const primaryPhoto = photos[0] || "";
+    const category = body.category || "General";
 
     await env.DB.prepare(
-      "INSERT INTO products (tenant_id, name, photo, photos_json, sizes_json) VALUES (?, ?, ?, ?, ?)"
-    ).bind(tenantId, body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes)).run();
+      "INSERT INTO products (tenant_id, name, photo, photos_json, sizes_json, category) VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(tenantId, body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), category).run();
 
     return json({ success: true });
   } catch (err) {
@@ -52,10 +54,11 @@ export async function onRequestPut(context) {
 
     const photos = (body.photos || []).filter(Boolean);
     const primaryPhoto = photos[0] || "";
+    const category = body.category || "General";
 
     await env.DB.prepare(
-      "UPDATE products SET name = ?, photo = ?, photos_json = ?, sizes_json = ? WHERE id = ? AND tenant_id = ?"
-    ).bind(body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), body.id, tenantId).run();
+      "UPDATE products SET name = ?, photo = ?, photos_json = ?, sizes_json = ?, category = ? WHERE id = ? AND tenant_id = ?"
+    ).bind(body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), category, body.id, tenantId).run();
 
     return json({ success: true });
   } catch (err) {

@@ -4,6 +4,8 @@ layout: base.njk
 ---
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@5/dist/photoswipe.css">
 
+<div class="category-pills" id="categoryPills"></div>
+
 <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
   <input type="text" class="form-control" id="searchInput" placeholder="Search products, sizes, price..." style="flex:1; min-width:200px;">
   <select class="form-select" id="sortSelect" style="width:auto;">
@@ -113,6 +115,7 @@ layout: base.njk
         return;
       }
 
+      renderCategoryPills();
       renderCatalog();
       restoreCart();
     } catch (err) {
@@ -297,29 +300,51 @@ layout: base.njk
     openCartModal();
   }
 
-  // ---- Search ----
+  // ---- Category pills ----
+  let activeCategory = "All";
+
+  function renderCategoryPills() {
+    const categories = ["All", ...new Set(products.map(p => p.category || "General"))];
+    const el = document.getElementById("categoryPills");
+    el.innerHTML = categories.map(c => `
+      <button type="button" class="category-pill ${c === activeCategory ? "active" : ""}" onclick="selectCategory('${c.replace(/'/g, "\\'")}')">${c}</button>
+    `).join("");
+  }
+
+  function selectCategory(category) {
+    activeCategory = category;
+    renderCategoryPills();
+    applyFilters();
+  }
+
+  // ---- Search + category + sort, combined ----
   let searchTimeout;
   document.getElementById("searchInput").addEventListener("input", function () {
     clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-      const query = this.value.toLowerCase();
-      filteredProducts = products.filter(p =>
-        p.name.toLowerCase().includes(query) ||
-        Object.keys(p.sizes).some(s => s.toLowerCase().includes(query)) ||
-        Object.values(p.sizes).some(price => price.toString().includes(query))
-      );
-      renderCatalog();
-      restoreCart();
-    }, 300);
+    searchTimeout = setTimeout(applyFilters, 300);
   });
 
-  // ---- Sort ----
-  document.getElementById("sortSelect").addEventListener("change", function () {
-    if (this.value === "low") filteredProducts.sort((a, b) => getMinPrice(a) - getMinPrice(b));
-    if (this.value === "high") filteredProducts.sort((a, b) => getMinPrice(b) - getMinPrice(a));
+  document.getElementById("sortSelect").addEventListener("change", applyFilters);
+
+  function applyFilters() {
+    const query = document.getElementById("searchInput").value.toLowerCase();
+    const sortValue = document.getElementById("sortSelect").value;
+
+    filteredProducts = products.filter(p => {
+      const matchesCategory = activeCategory === "All" || (p.category || "General") === activeCategory;
+      const matchesSearch = !query ||
+        p.name.toLowerCase().includes(query) ||
+        Object.keys(p.sizes).some(s => s.toLowerCase().includes(query)) ||
+        Object.values(p.sizes).some(price => price.toString().includes(query));
+      return matchesCategory && matchesSearch;
+    });
+
+    if (sortValue === "low") filteredProducts.sort((a, b) => getMinPrice(a) - getMinPrice(b));
+    if (sortValue === "high") filteredProducts.sort((a, b) => getMinPrice(b) - getMinPrice(a));
+
     renderCatalog();
     restoreCart();
-  });
+  }
 
   function getMinPrice(product) {
     return Math.min(...Object.values(product.sizes));

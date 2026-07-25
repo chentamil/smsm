@@ -72,12 +72,14 @@ function validateOrder(customer, items) {
 
   const name = (customer.name || "").trim();
   const email = (customer.email || "").trim();
+  const phone = (customer.phone || "").trim();
   const address = (customer.address || "").trim();
   const city = (customer.city || "").trim();
   const state = (customer.state || "").trim();
 
   if (name.length < 2 || name.length > 100) errors.push("Name must be 2-100 characters");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Invalid email address");
+  if (!/^\d{10,15}$/.test(phone.replace(/\D/g, ""))) errors.push("Invalid phone number");
   if (address.length < 5 || address.length > 300) errors.push("Address must be 5-300 characters");
   if (city.length < 2 || city.length > 100) errors.push("City must be 2-100 characters");
   if (state.length < 2 || state.length > 100) errors.push("State must be 2-100 characters");

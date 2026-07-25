@@ -1103,3 +1103,66 @@ input:focus, select:focus {
   height: 18px;
   cursor: pointer;
 }
+
+/* ==========================================================================
+   Order status color-coding (select dropdowns in table + modal)
+   ========================================================================== */
+
+.status-select[data-status="UNPAID"]    { background: var(--color-danger-light);  color: var(--color-danger); font-weight: 700; border-color: var(--color-danger); }
+.status-select[data-status="CONFIRMED"] { background: var(--color-info-light);    color: var(--color-info); }
+.status-select[data-status="SHIPPED"]   { background: var(--color-info-light);    color: var(--color-info); }
+.status-select[data-status="DELIVERED"] { background: var(--color-success-light); color: var(--color-success); }
+.status-select[data-status="CANCELLED"] { background: var(--color-surface-sunken); color: var(--color-text-faint); }
+
+.status-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+.status-dot[data-status="UNPAID"]    { background: var(--color-danger); }
+.status-dot[data-status="CONFIRMED"] { background: var(--color-info); }
+.status-dot[data-status="SHIPPED"]   { background: var(--color-info); }
+.status-dot[data-status="DELIVERED"] { background: var(--color-success); }
+.status-dot[data-status="CANCELLED"] { background: var(--color-text-faint); }
+
+/* ==========================================================================
+   Pagination
+   ========================================================================== */
+
+.pagination-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-3);
+  justify-content: center;
+}
+.pagination-nav .btn { min-width: 36px; padding: 6px 10px; }
+
+/* ==========================================================================
+   Category pills (storefront catalog filter)
+   ========================================================================== */
+
+.category-pills {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
+  scrollbar-width: none;
+}
+.category-pills::-webkit-scrollbar { display: none; }
+.category-pill {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  white-space: nowrap;
+}
+.category-pill.active { background: var(--color-primary); color: #fff; }

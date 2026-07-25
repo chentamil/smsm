@@ -5,14 +5,15 @@ export async function onRequestGet(context) {
 
   try {
     const { results } = await env.DB.prepare(
-      "SELECT id, name, photo, photos_json, sizes_json FROM products WHERE tenant_id = ?"
+      "SELECT id, name, photo, photos_json, sizes_json, category FROM products WHERE tenant_id = ?"
     ).bind(tenantId).all();
 
     const products = results.map(p => ({
       id: p.id,
       name: p.name,
       photos: parsePhotos(p.photo, p.photos_json),
-      sizes: JSON.parse(p.sizes_json)
+      sizes: JSON.parse(p.sizes_json),
+      category: p.category || "General"
     }));
 
     return new Response(JSON.stringify(products), {

@@ -1,0 +1,5 @@
+ALTER TABLE products ADD COLUMN category TEXT DEFAULT 'General';
+
+ALTER TABLE sellers ADD COLUMN gst_enabled INTEGER DEFAULT 0;
+ALTER TABLE sellers ADD COLUMN gst_percent REAL DEFAULT 0;
+ALTER TABLE sellers ADD COLUMN inventory_enabled INTEGER DEFAULT 0;
