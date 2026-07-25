@@ -33,7 +33,16 @@ layout: admin-base.njk
 
 <!-- ============ Products ============ -->
 <section class="admin-section" id="section-products">
-  <h2>Add Product</h2>
+  <h2>Categories</h2>
+  <div class="surface-card">
+    <div class="d-flex gap-2 mb-3">
+      <input type="text" class="form-control" id="new-category-name" placeholder="New category name">
+      <button class="btn btn-primary" type="button" onclick="addCategory()">Add</button>
+    </div>
+    <div id="category-list" class="d-flex flex-wrap gap-2"></div>
+  </div>
+
+  <h2 style="margin-top: var(--space-5);">Add Product</h2>
   <form id="add-form" class="surface-card">
     <div class="form-field">
       <label class="form-label" for="p-name">Product name</label>
@@ -52,8 +61,18 @@ layout: admin-base.njk
       <input type="text" class="form-control" id="p-photo3">
     </div>
     <div class="form-field">
-      <label class="form-label" for="p-category">Category</label>
-      <input type="text" class="form-control" id="p-category" placeholder="e.g. Groceries, Skincare" value="General">
+      <label class="form-label">Categories</label>
+      <div id="p-category-checkboxes" class="d-flex flex-wrap gap-2"></div>
+    </div>
+    <div class="row g-2">
+      <div class="col-6 form-field">
+        <label class="form-label" for="p-stock">Stock quantity</label>
+        <input type="number" class="form-control" id="p-stock" min="0" value="0">
+      </div>
+      <div class="col-6 form-field">
+        <label class="form-label" for="p-gst">GST %</label>
+        <input type="number" class="form-control" id="p-gst" min="0" max="28" step="0.1" value="0">
+      </div>
     </div>
     <div class="form-field">
       <label class="form-label" for="p-sizes">Sizes (JSON)</label>
@@ -145,7 +164,7 @@ layout: admin-base.njk
     </div>
 
     <hr>
-    <p style="font-size:13px; color:var(--color-text-muted);">Coming soon - toggle these on when you're ready to use them.</p>
+    <p style="font-size:13px; color:var(--color-text-muted);">Stock is deducted when an order is Confirmed (not when placed), and restored automatically if a Confirmed/Shipped/Delivered order is Cancelled.</p>
 
     <div class="form-field d-flex align-items-center justify-content-between">
       <label class="form-label" for="s-inventory" style="margin:0;">Enable Inventory Tracking</label>
@@ -153,12 +172,9 @@ layout: admin-base.njk
     </div>
     <div class="form-field d-flex align-items-center justify-content-between">
       <label class="form-label" for="s-gst" style="margin:0;">Enable GST</label>
-      <input type="checkbox" id="s-gst" style="width:20px; height:20px;" onchange="document.getElementById('s-gst-percent').disabled = !this.checked">
+      <input type="checkbox" id="s-gst" style="width:20px; height:20px;">
     </div>
-    <div class="form-field">
-      <label class="form-label" for="s-gst-percent">GST %</label>
-      <input type="number" class="form-control" id="s-gst-percent" min="0" max="28" step="0.1" disabled>
-    </div>
+    <p style="font-size:12px; color:var(--color-text-muted); margin-top:-8px;">GST rate is set per product (in Add/Edit Product) - this just switches GST on or off storewide.</p>
 
     <button type="submit" class="btn btn-primary btn-block">Save Settings</button>
   </form>
@@ -215,8 +231,18 @@ layout: admin-base.njk
           <input type="text" class="form-control" id="edit-p-photo3" placeholder="https://...">
         </div>
         <div class="form-field">
-          <label class="form-label" for="edit-p-category">Category</label>
-          <input type="text" class="form-control" id="edit-p-category" placeholder="e.g. Groceries, Skincare">
+          <label class="form-label">Categories</label>
+          <div id="edit-p-category-checkboxes" class="d-flex flex-wrap gap-2"></div>
+        </div>
+        <div class="row g-2">
+          <div class="col-6 form-field">
+            <label class="form-label" for="edit-p-stock">Stock quantity</label>
+            <input type="number" class="form-control" id="edit-p-stock" min="0">
+          </div>
+          <div class="col-6 form-field">
+            <label class="form-label" for="edit-p-gst">GST %</label>
+            <input type="number" class="form-control" id="edit-p-gst" min="0" max="28" step="0.1">
+          </div>
         </div>
         <div class="form-field">
           <label class="form-label" for="edit-p-sizes">Sizes (JSON)</label>
@@ -300,6 +326,74 @@ layout: admin-base.njk
   };
   setInterval(() => window.loadDashboard(), 30000);
 
+  // ---- Categories ----
+  let allCategories = [];
+
+  async function loadCategories() {
+    const res = await fetch("/api/admin/categories");
+    allCategories = await res.json();
+    renderCategoryList();
+    renderCategoryCheckboxes("p-category-checkboxes", []);
+  }
+
+  function renderCategoryList() {
+    const el = document.getElementById("category-list");
+    if (!Array.isArray(allCategories) || allCategories.length === 0) {
+      el.innerHTML = `<span style="font-size:13px; color:var(--color-text-muted);">No categories yet - add one above.</span>`;
+      return;
+    }
+    el.innerHTML = allCategories.map(c => `
+      <span class="badge badge-neutral" style="display:inline-flex; align-items:center; gap:6px; padding:8px 12px;">
+        ${c.name}
+        <button onclick="deleteCategory(${c.id})" style="border:none; background:none; color:var(--color-danger); cursor:pointer; font-size:14px; line-height:1;">&times;</button>
+      </span>
+    `).join("");
+  }
+
+  async function addCategory() {
+    const input = document.getElementById("new-category-name");
+    const name = input.value.trim();
+    if (!name) return;
+
+    await fetch("/api/admin/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    input.value = "";
+    await loadCategories();
+  }
+
+  async function deleteCategory(id) {
+    if (!confirm("Delete this category? Products in it will be unassigned from it.")) return;
+    await fetch("/api/admin/categories", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    await loadCategories();
+    loadProducts();
+  }
+
+  function renderCategoryCheckboxes(containerId, selectedIds) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!Array.isArray(allCategories) || allCategories.length === 0) {
+      el.innerHTML = `<span style="font-size:13px; color:var(--color-text-muted);">No categories yet - add one in Categories above.</span>`;
+      return;
+    }
+    el.innerHTML = allCategories.map(c => `
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; background:var(--color-surface-sunken); padding:6px 10px; border-radius: var(--radius-sm); cursor:pointer;">
+        <input type="checkbox" class="category-checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? "checked" : ""}>
+        ${c.name}
+      </label>
+    `).join("");
+  }
+
+  function getSelectedCategoryIds(containerId) {
+    return [...document.querySelectorAll(`#${containerId} .category-checkbox:checked`)].map(cb => Number(cb.value));
+  }
+
   // ---- Products ----
   let productsPage = 1;
 
@@ -328,7 +422,7 @@ layout: admin-base.njk
       <table class="table-app">
         <thead><tr>
           <th><input type="checkbox" class="select-checkbox" onchange="toggleAllProducts(this.checked)"></th>
-          <th>Image</th><th>Name</th><th>Category</th><th>Sizes</th><th>Actions</th>
+          <th>Image</th><th>Name</th><th>Categories</th><th>Stock</th><th>GST%</th><th>Sizes</th><th>Actions</th>
         </tr></thead>
         <tbody>
           ${pageItems.map(p => `
@@ -336,7 +430,9 @@ layout: admin-base.njk
               <td data-label="Select"><input type="checkbox" class="select-checkbox product-checkbox" value="${p.id}" onchange="updateProductsBulkBar()"></td>
               <td data-label="Image"><img class="product-thumb" src="${(p.photos && p.photos[0]) || ''}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=No+Image'"></td>
               <td data-label="Name">${p.name}</td>
-              <td data-label="Category">${p.category || "General"}</td>
+              <td data-label="Categories">${(p.categories || []).map(c => c.name).join(", ") || "-"}</td>
+              <td data-label="Stock">${p.stock ?? 0}</td>
+              <td data-label="GST%">${p.gstPercent ?? 0}</td>
               <td data-label="Sizes">${JSON.stringify(p.sizes)}</td>
               <td data-label="Actions">
                 <button class="btn btn-secondary btn-sm" onclick="openEditProduct(${p.id})"><i class="bi bi-pencil"></i></button>
@@ -385,9 +481,11 @@ layout: admin-base.njk
     document.getElementById("edit-p-photo1").value = photos[0] || "";
     document.getElementById("edit-p-photo2").value = photos[1] || "";
     document.getElementById("edit-p-photo3").value = photos[2] || "";
-    document.getElementById("edit-p-category").value = p.category || "General";
+    document.getElementById("edit-p-stock").value = p.stock ?? 0;
+    document.getElementById("edit-p-gst").value = p.gstPercent ?? 0;
     document.getElementById("edit-p-sizes").value = JSON.stringify(p.sizes);
     document.getElementById("edit-p-result").innerHTML = "";
+    renderCategoryCheckboxes("edit-p-category-checkboxes", (p.categories || []).map(c => c.id));
 
     const modalEl = document.getElementById("editProductModal");
     if (!editProductModalInstance) editProductModalInstance = new bootstrap.Modal(modalEl);
@@ -418,7 +516,9 @@ layout: admin-base.njk
         name: document.getElementById("edit-p-name").value,
         photos,
         sizes,
-        category: document.getElementById("edit-p-category").value || "General"
+        stock: Number(document.getElementById("edit-p-stock").value) || 0,
+        gstPercent: Number(document.getElementById("edit-p-gst").value) || 0,
+        categoryIds: getSelectedCategoryIds("edit-p-category-checkboxes")
       })
     });
     const data = await res.json();
@@ -478,7 +578,9 @@ layout: admin-base.njk
         name: document.getElementById("p-name").value,
         photos,
         sizes,
-        category: document.getElementById("p-category").value || "General"
+        stock: Number(document.getElementById("p-stock").value) || 0,
+        gstPercent: Number(document.getElementById("p-gst").value) || 0,
+        categoryIds: getSelectedCategoryIds("p-category-checkboxes")
       })
     });
     const data = await res.json();
@@ -486,6 +588,7 @@ layout: admin-base.njk
     if (data.success) {
       resultEl.innerHTML = `<div class="alert alert-success">Product added.</div>`;
       document.getElementById("add-form").reset();
+      renderCategoryCheckboxes("p-category-checkboxes", []);
       loadProducts();
     } else {
       resultEl.innerHTML = `<div class="alert alert-danger">${data.error || "unknown error"}</div>`;
@@ -640,6 +743,7 @@ layout: admin-base.njk
       </table>
       <div class="d-flex gap-2 flex-wrap" style="margin-top: var(--space-3);">
         <button class="btn btn-secondary btn-sm" onclick="emailInvoice('${o.order_id}')"><i class="bi bi-envelope"></i> Email Invoice</button>
+        <button class="btn btn-secondary btn-sm" onclick="viewInvoice('${o.order_id}')"><i class="bi bi-receipt-cutoff"></i> View Invoice</button>
         <button class="btn btn-secondary btn-sm" onclick="showPaymentQR('${o.order_id}')"><i class="bi bi-qr-code"></i> Payment QR</button>
         <button class="btn btn-secondary btn-sm" onclick="sendWhatsAppReminder('${o.order_id}')"><i class="bi bi-whatsapp"></i> WhatsApp Reminder</button>
       </div>
@@ -665,12 +769,37 @@ layout: admin-base.njk
       : `<div class="alert alert-danger">${data.error || "Could not send invoice"}</div>`;
   }
 
+  function viewInvoice(orderId) {
+    window.open(`/admin/invoice/?order_id=${encodeURIComponent(orderId)}`, "_blank");
+  }
+
   function showPaymentQR(orderId) {
     const o = allOrders.find(x => x.order_id === orderId);
     if (!o) return;
     const upiUri = `upi://pay?pa={{ site.upiId }}&pn=${encodeURIComponent("{{ site.upiPayeeName }}")}&am=${o.amount}&cu=INR&tn=${encodeURIComponent("Order " + orderId)}`;
-    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(upiUri)}`;
-    window.open(qrImgUrl, "_blank");
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&bgcolor=ffffff&color=000000&margin=10&data=${encodeURIComponent(upiUri)}`;
+
+    const win = window.open("", "_blank");
+    win.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Payment QR - Order ${orderId}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { background:#fff; color:#111; font-family: -apple-system, sans-serif; text-align:center; padding: 32px 16px; }
+        h2 { margin-bottom: 4px; }
+        p { margin: 4px 0; }
+        .amount { font-size: 28px; font-weight: 700; margin: 12px 0; }
+        img { margin-top: 16px; border: 1px solid #eee; border-radius: 12px; }
+      </style></head>
+      <body>
+        <h2>{{ site.siteName }}</h2>
+        <p>Scan to Pay via UPI</p>
+        <div class="amount">₹${o.amount}</div>
+        <img src="${qrImgUrl}" alt="UPI QR code">
+        <p style="margin-top:16px; color:#666; font-size:13px;">Order #${orderId}</p>
+      </body></html>
+    `);
+    win.document.close();
   }
 
   function sendWhatsAppReminder(orderId) {
@@ -721,8 +850,6 @@ layout: admin-base.njk
     document.getElementById("s-email").value = s.email || "";
     document.getElementById("s-inventory").checked = !!s.inventoryEnabled;
     document.getElementById("s-gst").checked = !!s.gstEnabled;
-    document.getElementById("s-gst-percent").value = s.gstPercent || "";
-    document.getElementById("s-gst-percent").disabled = !s.gstEnabled;
   }
 
   document.getElementById("settings-form").addEventListener("submit", async (e) => {
@@ -739,8 +866,7 @@ layout: admin-base.njk
         mobile: document.getElementById("s-mobile").value,
         email: document.getElementById("s-email").value,
         inventoryEnabled: document.getElementById("s-inventory").checked,
-        gstEnabled: document.getElementById("s-gst").checked,
-        gstPercent: Number(document.getElementById("s-gst-percent").value) || 0
+        gstEnabled: document.getElementById("s-gst").checked
       })
     });
     const data = await res.json();
@@ -749,6 +875,7 @@ layout: admin-base.njk
       : `<div class="alert alert-danger">${data.error || "Could not save"}</div>`;
   });
 
+  loadCategories();
   loadProducts();
   loadOrders();
   loadSettings();

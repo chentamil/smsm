@@ -13,7 +13,7 @@ export async function onRequestPost(context) {
     if (!body.order_id) return json({ error: "order_id required" }, 400);
 
     const order = await env.DB.prepare(
-      "SELECT order_id, customer_json, items_json, amount, status, date FROM orders WHERE order_id = ? AND tenant_id = ?"
+      "SELECT order_id, customer_json, items_json, amount, subtotal, gst_amount, status, date FROM orders WHERE order_id = ? AND tenant_id = ?"
     ).bind(body.order_id, tenantId).first();
 
     if (!order) return json({ error: "Order not found" }, 404);
@@ -25,11 +25,15 @@ export async function onRequestPost(context) {
       `<li>${i.name} (${i.size}) x ${i.qty} - ₹${i.price * i.qty}</li>`
     ).join("");
 
+    const gstLine = order.gst_amount > 0 ? `<p>GST: ₹${order.gst_amount}</p>` : "";
+
     const html = `
       <h2>Invoice - Order #${order.order_id}</h2>
       <p>Hi ${customer.name},</p>
       <p>Here is your invoice summary:</p>
       <ul>${itemsHtml}</ul>
+      <p>Subtotal: ₹${order.subtotal}</p>
+      ${gstLine}
       <p><b>Total: ₹${order.amount}</b></p>
       <p>Status: ${order.status}</p>
       <p>Order date: ${new Date(order.date).toLocaleString()}</p>

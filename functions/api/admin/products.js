@@ -1,23 +1,37 @@
 // /api/admin/products
-// GET    -> list all products
-// POST   -> create a product   { name, photos: ["url1","url2","url3"], sizes: {S:100,M:120}, category }
-// PUT    -> update a product   { id, name, photos, sizes, category }
-// DELETE -> delete product(s)  { id } for one, or { ids: [1,2,3] } for bulk
-const tenantId = "default"; // phase 6 will read this from Host header
+// GET    -> list all products, each with categoryIds: [1,2], categoryNames: ["Groceries",...]
+// POST   -> create { name, photos, sizes, categoryIds: [1,2], stock, gstPercent }
+// PUT    -> update { id, name, photos, sizes, categoryIds, stock, gstPercent }
+// DELETE -> delete product(s)  { id } or { ids: [...] }
+const tenantId = "default";
 
 export async function onRequestGet(context) {
   const { env } = context;
   try {
     const { results } = await env.DB.prepare(
-      "SELECT id, name, photo, photos_json, sizes_json, category FROM products WHERE tenant_id = ?"
+      "SELECT id, name, photo, photos_json, sizes_json, stock, gst_percent FROM products WHERE tenant_id = ?"
     ).bind(tenantId).all();
+
+    const { results: links } = await env.DB.prepare(
+      `SELECT pc.product_id, pc.category_id, c.name AS category_name
+       FROM product_categories pc
+       JOIN categories c ON c.id = pc.category_id`
+    ).all();
+
+    const catsByProduct = {};
+    links.forEach(l => {
+      if (!catsByProduct[l.product_id]) catsByProduct[l.product_id] = [];
+      catsByProduct[l.product_id].push({ id: l.category_id, name: l.category_name });
+    });
 
     const products = results.map(p => ({
       id: p.id,
       name: p.name,
       photos: parsePhotos(p.photo, p.photos_json),
       sizes: JSON.parse(p.sizes_json),
-      category: p.category || "General"
+      stock: p.stock || 0,
+      gstPercent: p.gst_percent || 0,
+      categories: catsByProduct[p.id] || []
     }));
 
     return json(products);
@@ -34,11 +48,19 @@ export async function onRequestPost(context) {
 
     const photos = (body.photos || []).filter(Boolean);
     const primaryPhoto = photos[0] || "";
-    const category = body.category || "General";
+    const categoryIds = Array.isArray(body.categoryIds) ? body.categoryIds : [];
 
-    await env.DB.prepare(
-      "INSERT INTO products (tenant_id, name, photo, photos_json, sizes_json, category) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(tenantId, body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), category).run();
+    const result = await env.DB.prepare(
+      "INSERT INTO products (tenant_id, name, photo, photos_json, sizes_json, stock, gst_percent) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).bind(tenantId, body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), body.stock || 0, body.gstPercent || 0).run();
+
+    const productId = result.meta.last_row_id;
+    if (categoryIds.length > 0) {
+      const statements = categoryIds.map(catId =>
+        env.DB.prepare("INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)").bind(productId, catId)
+      );
+      await env.DB.batch(statements);
+    }
 
     return json({ success: true });
   } catch (err) {
@@ -54,11 +76,19 @@ export async function onRequestPut(context) {
 
     const photos = (body.photos || []).filter(Boolean);
     const primaryPhoto = photos[0] || "";
-    const category = body.category || "General";
+    const categoryIds = Array.isArray(body.categoryIds) ? body.categoryIds : [];
 
     await env.DB.prepare(
-      "UPDATE products SET name = ?, photo = ?, photos_json = ?, sizes_json = ?, category = ? WHERE id = ? AND tenant_id = ?"
-    ).bind(body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), category, body.id, tenantId).run();
+      "UPDATE products SET name = ?, photo = ?, photos_json = ?, sizes_json = ?, stock = ?, gst_percent = ? WHERE id = ? AND tenant_id = ?"
+    ).bind(body.name, primaryPhoto, JSON.stringify(photos), JSON.stringify(body.sizes), body.stock || 0, body.gstPercent || 0, body.id, tenantId).run();
+
+    await env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(body.id).run();
+    if (categoryIds.length > 0) {
+      const statements = categoryIds.map(catId =>
+        env.DB.prepare("INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)").bind(body.id, catId)
+      );
+      await env.DB.batch(statements);
+    }
 
     return json({ success: true });
   } catch (err) {
@@ -71,12 +101,13 @@ export async function onRequestDelete(context) {
   try {
     const body = await request.json();
     const ids = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
-
     if (ids.length === 0) return json({ error: "id or ids required" }, 400);
 
-    const statements = ids.map(id =>
-      env.DB.prepare("DELETE FROM products WHERE id = ? AND tenant_id = ?").bind(id, tenantId)
-    );
+    const statements = [];
+    ids.forEach(id => {
+      statements.push(env.DB.prepare("DELETE FROM products WHERE id = ? AND tenant_id = ?").bind(id, tenantId));
+      statements.push(env.DB.prepare("DELETE FROM product_categories WHERE product_id = ?").bind(id));
+    });
     await env.DB.batch(statements);
 
     return json({ success: true, deleted: ids.length });
@@ -90,9 +121,7 @@ function parsePhotos(photo, photosJson) {
     try {
       const arr = JSON.parse(photosJson);
       if (Array.isArray(arr) && arr.length > 0) return arr.filter(Boolean);
-    } catch {
-      // fall through to legacy photo
-    }
+    } catch {}
   }
   return photo ? [photo] : [];
 }

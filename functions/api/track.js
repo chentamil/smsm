@@ -10,7 +10,7 @@ export async function onRequestGet(context) {
 
   try {
     const order = await env.DB.prepare(
-      "SELECT order_id, customer_json, items_json, amount, status, date FROM orders WHERE order_id = ?"
+      "SELECT order_id, customer_json, items_json, amount, subtotal, gst_amount, status, date FROM orders WHERE order_id = ?"
     ).bind(orderId).first();
 
     if (!order) {
@@ -22,6 +22,8 @@ export async function onRequestGet(context) {
       customer: JSON.parse(order.customer_json),
       items: JSON.parse(order.items_json),
       amount: order.amount,
+      subtotal: order.subtotal,
+      gstAmount: order.gst_amount,
       status: order.status,
       date: order.date
     });

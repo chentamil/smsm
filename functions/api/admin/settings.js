@@ -1,13 +1,15 @@
 // /api/admin/settings
 // GET -> current seller/store info + feature flags
-// PUT -> upsert seller/store info  { name, address, gstin, mobile, email, gstEnabled, gstPercent, inventoryEnabled }
-const tenantId = "default"; // phase 6 will read this from Host region
+// PUT -> upsert seller/store info  { name, address, gstin, mobile, email, gstEnabled, inventoryEnabled }
+// Note: GST rate is now set per-product (see products), not globally here -
+// gstEnabled is just the master on/off switch for whether GST applies at all.
+const tenantId = "default";
 
 export async function onRequestGet(context) {
   const { env } = context;
   try {
     const row = await env.DB.prepare(
-      "SELECT name, address, gstin, mobile, email, gst_enabled, gst_percent, inventory_enabled FROM sellers WHERE tenant_id = ?"
+      "SELECT name, address, gstin, mobile, email, gst_enabled, inventory_enabled FROM sellers WHERE tenant_id = ?"
     ).bind(tenantId).first();
 
     if (!row) return json({});
@@ -19,7 +21,6 @@ export async function onRequestGet(context) {
       mobile: row.mobile,
       email: row.email,
       gstEnabled: !!row.gst_enabled,
-      gstPercent: row.gst_percent || 0,
       inventoryEnabled: !!row.inventory_enabled
     });
   } catch (err) {
@@ -33,8 +34,8 @@ export async function onRequestPut(context) {
     const body = await request.json();
 
     await env.DB.prepare(
-      `INSERT INTO sellers (tenant_id, name, address, gstin, mobile, email, gst_enabled, gst_percent, inventory_enabled)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO sellers (tenant_id, name, address, gstin, mobile, email, gst_enabled, inventory_enabled)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(tenant_id) DO UPDATE SET
          name = excluded.name,
          address = excluded.address,
@@ -42,7 +43,6 @@ export async function onRequestPut(context) {
          mobile = excluded.mobile,
          email = excluded.email,
          gst_enabled = excluded.gst_enabled,
-         gst_percent = excluded.gst_percent,
          inventory_enabled = excluded.inventory_enabled`
     ).bind(
       tenantId,
@@ -52,7 +52,6 @@ export async function onRequestPut(context) {
       body.mobile || "",
       body.email || "",
       body.gstEnabled ? 1 : 0,
-      body.gstPercent || 0,
       body.inventoryEnabled ? 1 : 0
     ).run();
 

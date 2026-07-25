@@ -3,7 +3,7 @@ import { isRateLimited } from "../_lib/auth.js";
 // POST /api/order -> save an order (replaces api.php action "saveOrder")
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const tenantId = "default"; // phase 6 will read this from Host header
+  const tenantId = "default";
 
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   if (isRateLimited(ip, 10, 10 * 60 * 1000)) {
@@ -21,7 +21,6 @@ export async function onRequestPost(context) {
     if (!turnstileToken) {
       return json({ error: "Captcha verification missing" }, 400);
     }
-
     const verifyRes = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -38,24 +37,70 @@ export async function onRequestPost(context) {
       return json({ error: errors.join("; ") }, 400);
     }
 
-    const amount = items.reduce((sum, i) => sum + (Number(i.price) * Number(i.qty)), 0);
+    // --- Authoritative price + GST lookup (never trust client-supplied price) ---
+    const sellerRow = await env.DB.prepare(
+      "SELECT gst_enabled FROM sellers WHERE tenant_id = ?"
+    ).bind(tenantId).first();
+    const gstEnabled = !!(sellerRow && sellerRow.gst_enabled);
+
+    const resolvedItems = [];
+    let subtotal = 0;
+    let gstAmount = 0;
+
+    for (const item of items) {
+      let unitPrice = Number(item.price) || 0;
+      let gstPercent = 0;
+
+      if (item.productId) {
+        const product = await env.DB.prepare(
+          "SELECT sizes_json, gst_percent FROM products WHERE id = ? AND tenant_id = ?"
+        ).bind(item.productId, tenantId).first();
+
+        if (product) {
+          const sizes = JSON.parse(product.sizes_json);
+          if (sizes[item.size] !== undefined) unitPrice = sizes[item.size];
+          gstPercent = product.gst_percent || 0;
+        }
+      }
+
+      const lineSubtotal = unitPrice * item.qty;
+      const lineGst = gstEnabled ? Math.round(lineSubtotal * gstPercent) / 100 : 0;
+
+      subtotal += lineSubtotal;
+      gstAmount += lineGst;
+
+      resolvedItems.push({
+        productId: item.productId || null,
+        name: item.name,
+        size: item.size,
+        price: unitPrice,
+        qty: item.qty,
+        gstPercent,
+        gstAmount: lineGst
+      });
+    }
+
+    subtotal = Math.round(subtotal * 100) / 100;
+    gstAmount = Math.round(gstAmount * 100) / 100;
+    const amount = Math.round((subtotal + gstAmount) * 100) / 100;
+
     const orderId = String(Date.now());
     const date = new Date().toISOString();
 
     await env.DB.prepare(
-      `INSERT INTO orders (order_id, tenant_id, customer_json, items_json, amount, status, date)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).bind(orderId, tenantId, JSON.stringify(customer), JSON.stringify(items), amount, "UNPAID", date).run();
+      `INSERT INTO orders (order_id, tenant_id, customer_json, items_json, amount, subtotal, gst_amount, status, date, stock_deducted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
+    ).bind(orderId, tenantId, JSON.stringify(customer), JSON.stringify(resolvedItems), amount, subtotal, gstAmount, "UNPAID", date).run();
 
     if (env.RESEND_API_KEY) {
       try {
-        await sendOrderEmail(env.RESEND_API_KEY, customer, orderId, items, amount);
+        await sendOrderEmail(env.RESEND_API_KEY, customer, orderId, resolvedItems, subtotal, gstAmount, amount);
       } catch (emailErr) {
         console.error("Email send failed:", emailErr.message);
       }
     }
 
-    return json({ success: true, order_id: orderId, amount });
+    return json({ success: true, order_id: orderId, subtotal, gstAmount, amount });
 
   } catch (err) {
     return json({ error: "Server error", detail: err.message }, 500);
@@ -100,15 +145,19 @@ function validateOrder(customer, items) {
   return errors;
 }
 
-async function sendOrderEmail(apiKey, customer, orderId, items, amount) {
+async function sendOrderEmail(apiKey, customer, orderId, items, subtotal, gstAmount, amount) {
   const itemsHtml = items.map(i =>
     `<li>${i.name} (${i.size}) x ${i.qty} - ₹${i.price * i.qty}</li>`
   ).join("");
+
+  const gstLine = gstAmount > 0 ? `<p>GST: ₹${gstAmount}</p>` : "";
 
   const html = `
     <h2>Order Confirmed</h2>
     <p>Hi ${customer.name}, your order <b>#${orderId}</b> has been placed.</p>
     <ul>${itemsHtml}</ul>
+    <p>Subtotal: ₹${subtotal}</p>
+    ${gstLine}
     <p><b>Total: ₹${amount}</b></p>
     <p>Track your order anytime at /track/ using this order ID.</p>
   `;

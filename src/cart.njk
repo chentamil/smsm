@@ -5,9 +5,21 @@ layout: base.njk
 <h1>Your Cart</h1>
 
 <div id="cart-items" class="stack-md" style="margin-bottom: var(--space-4);"></div>
-<div class="surface-card" style="display:flex; justify-content:space-between; align-items:center;">
-  <span style="font-weight:600;">Total</span>
-  <span style="font-family:var(--font-display); font-weight:700; font-size:18px;">₹<span id="cart-total">0</span></span>
+
+<div class="surface-card">
+  <div style="display:flex; justify-content:space-between;">
+    <span>Subtotal</span>
+    <span>₹<span id="cart-subtotal">0</span></span>
+  </div>
+  <div id="cart-gst-row" style="display:none; justify-content:space-between; margin-top:4px;">
+    <span>GST</span>
+    <span>₹<span id="cart-gst">0</span></span>
+  </div>
+  <hr>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <span style="font-weight:600;">Total</span>
+    <span style="font-family:var(--font-display); font-weight:700; font-size:18px;">₹<span id="cart-total">0</span></span>
+  </div>
 </div>
 
 <h2 style="margin-top: var(--space-5);">Delivery Details</h2>
@@ -71,6 +83,15 @@ layout: base.njk
 <script>
   // Cart is stored as an object keyed "${id}-${size}" -> {product, size, qty, price}
   // (matches the catalog page's model)
+  let productGstMap = {};
+
+  fetch("/api/products").then(r => r.json()).then(products => {
+    if (Array.isArray(products)) {
+      products.forEach(p => productGstMap[p.id] = p.gstPercent || 0);
+    }
+    renderCart();
+  }).catch(() => renderCart());
+
   function getCart() {
     return JSON.parse(localStorage.getItem("cart") || "{}");
   }
@@ -80,11 +101,26 @@ layout: base.njk
   }
   function cartAsItemsArray(cart) {
     return Object.values(cart).map(c => ({
+      productId: c.product.id,
       name: c.product.name,
       size: c.size,
       price: c.price,
       qty: c.qty
     }));
+  }
+
+  // Live estimate only - order.js always recalculates authoritatively from
+  // the database, so this is purely for display before the order is placed.
+  function estimateTotals(cart) {
+    let subtotal = 0;
+    let gst = 0;
+    Object.values(cart).forEach(c => {
+      const lineSubtotal = c.price * c.qty;
+      const gstPercent = productGstMap[c.product.id] || 0;
+      subtotal += lineSubtotal;
+      gst += lineSubtotal * gstPercent / 100;
+    });
+    return { subtotal: Math.round(subtotal), gst: Math.round(gst), total: Math.round(subtotal + gst) };
   }
 
   function renderCart() {
@@ -99,7 +135,9 @@ layout: base.njk
           <p>Your cart is empty.</p>
           <a href="/catalog/" class="btn btn-outline-primary btn-sm">Browse products</a>
         </div>`;
+      document.getElementById("cart-subtotal").textContent = "0";
       document.getElementById("cart-total").textContent = "0";
+      document.getElementById("cart-gst-row").style.display = "none";
       return;
     }
 
@@ -115,8 +153,16 @@ layout: base.njk
         </div>`;
     }).join("");
 
-    const total = Object.values(cart).reduce((sum, c) => sum + (c.price * c.qty), 0);
-    document.getElementById("cart-total").textContent = total;
+    const totals = estimateTotals(cart);
+    document.getElementById("cart-subtotal").textContent = totals.subtotal;
+    document.getElementById("cart-total").textContent = totals.total;
+    const gstRow = document.getElementById("cart-gst-row");
+    if (totals.gst > 0) {
+      gstRow.style.display = "flex";
+      document.getElementById("cart-gst").textContent = totals.gst;
+    } else {
+      gstRow.style.display = "none";
+    }
   }
 
   function removeItem(key) {
@@ -173,7 +219,7 @@ layout: base.njk
         document.dispatchEvent(new Event("cart:updated"));
         document.getElementById("cart-items").innerHTML = "";
         document.getElementById("checkout-form").style.display = "none";
-        renderReceipt(data.order_id, customer, orderedItems, data.amount);
+        renderReceipt(data.order_id, customer, orderedItems, data.subtotal, data.gstAmount, data.amount);
       } else {
         resultEl.innerHTML = `<div class="alert alert-danger">Order failed: ${data.error || "unknown error"}</div>`;
         btn.disabled = false;
@@ -188,11 +234,8 @@ layout: base.njk
   });
 
   // ---- Receipt: UPI QR code, amount in words, printable ----
-  function renderReceipt(orderId, customer, items, amount) {
+  function renderReceipt(orderId, customer, items, subtotal, gstAmount, amount) {
     const resultEl = document.getElementById("order-result");
-
-    const upiUri = `upi://pay?pa={{ site.upiId }}&pn=${encodeURIComponent("{{ site.upiPayeeName }}")}&am=${amount}&cu=INR&tn=${encodeURIComponent("Order " + orderId)}`;
-    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(upiUri)}`;
 
     const itemRows = items.map(i => `
       <tr>
@@ -200,6 +243,11 @@ layout: base.njk
         <td data-label="Qty">${i.qty}</td>
         <td data-label="Total">₹${i.price * i.qty}</td>
       </tr>`).join("");
+
+    const gstLine = gstAmount > 0 ? `
+      <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--color-text-muted);">
+        <span>GST</span><span>₹${gstAmount}</span>
+      </div>` : "";
 
     resultEl.innerHTML = `
       <div class="alert alert-success">Order placed! A confirmation email has been sent.</div>
@@ -216,13 +264,24 @@ layout: base.njk
         <table class="table-app">
           <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
           <tbody>${itemRows}</tbody>
-          <tfoot><tr><td colspan="2" style="text-align:right; font-weight:700;">Grand Total</td><td style="font-weight:700;">₹${amount}</td></tr></tfoot>
         </table>
+
+        <div style="margin-top:var(--space-2);">
+          <div style="display:flex; justify-content:space-between; font-size:13px; color:var(--color-text-muted);">
+            <span>Subtotal</span><span>₹${subtotal}</span>
+          </div>
+          ${gstLine}
+          <div style="display:flex; justify-content:space-between; font-weight:700; margin-top:4px;">
+            <span>Grand Total</span><span>₹${amount}</span>
+          </div>
+        </div>
 
         <p class="receipt-words">Amount in words: ${amountToWords(amount)} only</p>
 
         <div class="receipt-qr">
-          <img src="${qrImgUrl}" alt="UPI payment QR code">
+          <button class="btn btn-outline-primary btn-sm" type="button" onclick="openPaymentQR(${amount}, '${orderId}')">
+            <i class="bi bi-qr-code"></i> View Payment QR
+          </button>
           <p style="font-size:12px; color:var(--color-text-muted); margin-top:var(--space-1);">Scan to pay via UPI (optional - order is confirmed as Cash on Delivery)</p>
         </div>
       </div>
@@ -232,6 +291,36 @@ layout: base.njk
         <a href="/catalog/" class="btn btn-primary btn-block">Continue Shopping</a>
       </div>
     `;
+  }
+
+  // Opens the UPI QR in a clean, white-background tab with shop name and
+  // amount clearly labeled (a bare image in a new tab can look black in
+  // dark-mode browsers, which makes it hard to scan).
+  function openPaymentQR(amount, orderId) {
+    const upiUri = `upi://pay?pa={{ site.upiId }}&pn=${encodeURIComponent("{{ site.upiPayeeName }}")}&am=${amount}&cu=INR&tn=${encodeURIComponent("Order " + orderId)}`;
+    const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&bgcolor=ffffff&color=000000&margin=10&data=${encodeURIComponent(upiUri)}`;
+
+    const win = window.open("", "_blank");
+    win.document.write(`
+      <!DOCTYPE html>
+      <html><head><title>Payment QR - Order ${orderId}</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        body { background:#fff; color:#111; font-family: -apple-system, sans-serif; text-align:center; padding: 32px 16px; }
+        h2 { margin-bottom: 4px; }
+        p { margin: 4px 0; }
+        .amount { font-size: 28px; font-weight: 700; margin: 12px 0; }
+        img { margin-top: 16px; border: 1px solid #eee; border-radius: 12px; }
+      </style></head>
+      <body>
+        <h2>{{ site.siteName }}</h2>
+        <p>Scan to Pay via UPI</p>
+        <div class="amount">₹${amount}</div>
+        <img src="${qrImgUrl}" alt="UPI QR code">
+        <p style="margin-top:16px; color:#666; font-size:13px;">Order #${orderId}</p>
+      </body></html>
+    `);
+    win.document.close();
   }
 
   // Indian numbering system (lakh/crore) amount-in-words converter
@@ -265,6 +354,4 @@ layout: base.njk
 
     return "Rupees " + words.trim();
   }
-
-  renderCart();
 </script>

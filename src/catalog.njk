@@ -304,7 +304,7 @@ layout: base.njk
   let activeCategory = "All";
 
   function renderCategoryPills() {
-    const categories = ["All", ...new Set(products.map(p => p.category || "General"))];
+    const categories = ["All", ...new Set(products.flatMap(p => (p.categories && p.categories.length > 0) ? p.categories : []))];
     const el = document.getElementById("categoryPills");
     el.innerHTML = categories.map(c => `
       <button type="button" class="category-pill ${c === activeCategory ? "active" : ""}" onclick="selectCategory('${c.replace(/'/g, "\\'")}')">${c}</button>
@@ -331,7 +331,7 @@ layout: base.njk
     const sortValue = document.getElementById("sortSelect").value;
 
     filteredProducts = products.filter(p => {
-      const matchesCategory = activeCategory === "All" || (p.category || "General") === activeCategory;
+      const matchesCategory = activeCategory === "All" || (p.categories && p.categories.includes(activeCategory));
       const matchesSearch = !query ||
         p.name.toLowerCase().includes(query) ||
         Object.keys(p.sizes).some(s => s.toLowerCase().includes(query)) ||
