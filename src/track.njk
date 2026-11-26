@@ -38,7 +38,7 @@ layout: base.njk
           <div class="stack-sm" style="margin-top: var(--space-3);">
             ${order.items.map(i => `
               <div style="display:flex; justify-content:space-between; font-size:14px;">
-                <span>${i.name} (${i.size}) x ${i.qty}</span>
+                <span>${i.name}${i.size ? " (" + i.size + ")" : ""} x ${i.qty}</span>
               </div>
             `).join("")}
           </div>

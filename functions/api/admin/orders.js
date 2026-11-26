@@ -59,10 +59,10 @@ export async function onRequestPatch(context) {
       if (!wasDeducted && willBeDeducted) {
         // Moving into a "stock committed" status for the first time - deduct.
         items.forEach(i => {
-          if (i.productId) {
+          if (i.variantId) {
             statements.push(
-              env.DB.prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND tenant_id = ?")
-                .bind(i.qty, i.productId, tenantId)
+              env.DB.prepare("UPDATE product_variants SET stock = stock - ? WHERE id = ?")
+                .bind(i.qty, i.variantId)
             );
           }
         });
@@ -73,10 +73,10 @@ export async function onRequestPatch(context) {
       } else if (wasDeducted && !willBeDeducted) {
         // Leaving a "stock committed" status (e.g. cancelled after confirming) - restore.
         items.forEach(i => {
-          if (i.productId) {
+          if (i.variantId) {
             statements.push(
-              env.DB.prepare("UPDATE products SET stock = stock + ? WHERE id = ? AND tenant_id = ?")
-                .bind(i.qty, i.productId, tenantId)
+              env.DB.prepare("UPDATE product_variants SET stock = stock + ? WHERE id = ?")
+                .bind(i.qty, i.variantId)
             );
           }
         });

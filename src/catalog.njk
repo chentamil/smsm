@@ -178,77 +178,133 @@ layout: base.njk
       <div class="col-12 col-md-4 mb-4">
         <div class="product-card">
           ${buildGallery(p)}
-          <div class="product-body">
+          <div class="product-body" id="body_${p.id}">
             <h3 class="product-name">${p.name}</h3>
-            <div style="font-size:13px; color:var(--color-text-muted);">Selected: ₹<span id="price_${p.id}">0</span></div>
-            ${Object.entries(p.sizes).map(([size, price]) => `
-              <div class="size-row">
-                <span class="size-label">${size} (₹${price})</span>
-                <div class="qty-stepper">
-                  <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',-1)">−</button>
-                  <input type="number" class="form-control qty-input" id="qty_${p.id}_${size}" value="0" min="0"
-                         oninput="manualQty(${p.id},'${size}')">
-                  <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},'${size}',1)">+</button>
-                </div>
-              </div>
-            `).join("")}
+            ${buildProductControls(p)}
           </div>
         </div>
       </div>
     `).join("");
 
     if (window.initPhotoSwipe) window.initPhotoSwipe(filteredProducts.map(p => p.id));
+    filteredProducts.forEach(p => refreshVariantDisplay(p.id));
   }
 
-  function changeQty(id, size, delta) {
-    const el = document.getElementById(`qty_${id}_${size}`);
-    el.value = Math.max(0, Number(el.value) + delta);
-    updateCart(id, size);
+  // Builds the attribute dropdowns (if any) + price/stock display + qty
+  // stepper for a single product. Simple products (no attributes) just get
+  // a price and a qty stepper, no dropdowns.
+  function buildProductControls(p) {
+    const attrSelects = (p.attributes || []).map(attr => `
+      <div class="form-field" style="margin-bottom:6px;">
+        <label class="form-label" style="margin-bottom:2px;">${attr.name}</label>
+        <select class="form-select form-select-sm" id="attr_${p.id}_${attr.name}" onchange="refreshVariantDisplay(${p.id})">
+          ${attr.values.map(v => `<option value="${v}">${v}</option>`).join("")}
+        </select>
+      </div>
+    `).join("");
+
+    return `
+      ${attrSelects}
+      <div style="font-size:14px; font-weight:700; margin: 4px 0;" id="variantPrice_${p.id}">₹0</div>
+      <div style="font-size:12px; color:var(--color-text-muted); margin-bottom:6px;" id="variantStock_${p.id}"></div>
+      <div class="qty-stepper">
+        <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},-1)">−</button>
+        <input type="number" class="form-control qty-input" id="qty_${p.id}" value="0" min="0" oninput="manualQty(${p.id})">
+        <button class="btn btn-outline-primary" type="button" onclick="changeQty(${p.id},1)">+</button>
+      </div>
+    `;
   }
 
-  function manualQty(id, size) {
-    const el = document.getElementById(`qty_${id}_${size}`);
-    if (el.value < 0) el.value = 0;
-    updateCart(id, size);
+  // Finds the variant matching the currently-selected attribute dropdowns
+  // for a product (or the single variant, for a simple product).
+  function resolveVariant(p) {
+    if (!p.attributes || p.attributes.length === 0) {
+      return p.variants[0];
+    }
+    const selected = {};
+    p.attributes.forEach(attr => {
+      const el = document.getElementById(`attr_${p.id}_${attr.name}`);
+      if (el) selected[attr.name] = el.value;
+    });
+    return p.variants.find(v =>
+      Object.keys(selected).every(key => v.values[key] === selected[key])
+    );
   }
 
-  function updateCart(id, size) {
-    const qty = Number(document.getElementById(`qty_${id}_${size}`).value);
-    const key = `${id}-${size}`;
-    const product = productMap[id];
-    const price = product.sizes[size];
+  function variantLabel(variant) {
+    if (!variant || !variant.values) return "";
+    return Object.values(variant.values).join(" / ");
+  }
+
+  function refreshVariantDisplay(productId) {
+    const p = productMap[productId];
+    const variant = resolveVariant(p);
+    const priceEl = document.getElementById(`variantPrice_${productId}`);
+    const stockEl = document.getElementById(`variantStock_${productId}`);
+    const qtyInput = document.getElementById(`qty_${productId}`);
+
+    if (!variant) {
+      priceEl.textContent = "Unavailable";
+      stockEl.textContent = "This combination is not available.";
+      qtyInput.disabled = true;
+      qtyInput.value = 0;
+      return;
+    }
+
+    priceEl.textContent = "₹" + variant.price;
+
+    if (variant.stock <= 0) {
+      stockEl.textContent = "Out of stock";
+      stockEl.style.color = "var(--color-danger)";
+      qtyInput.disabled = true;
+    } else {
+      stockEl.textContent = variant.stock <= 5 ? `Only ${variant.stock} left` : "In stock";
+      stockEl.style.color = "var(--color-text-muted)";
+      qtyInput.disabled = false;
+    }
+
+    // Reflect however much of THIS variant is already in the cart
+    qtyInput.value = (cart[variant.id] && cart[variant.id].qty) || 0;
+  }
+
+  function changeQty(productId, delta) {
+    const qtyInput = document.getElementById(`qty_${productId}`);
+    qtyInput.value = Math.max(0, Number(qtyInput.value) + delta);
+    manualQty(productId);
+  }
+
+  function manualQty(productId) {
+    const qtyInput = document.getElementById(`qty_${productId}`);
+    if (qtyInput.value < 0) qtyInput.value = 0;
+
+    const p = productMap[productId];
+    const variant = resolveVariant(p);
+    if (!variant) return;
+
+    const qty = Number(qtyInput.value);
 
     if (qty > 0) {
-      cart[key] = { product: { id: product.id, name: product.name, photo: (product.photos && product.photos[0]) || "" }, size, qty, price };
+      cart[variant.id] = {
+        productId: p.id,
+        variantId: variant.id,
+        name: p.name,
+        valuesLabel: variantLabel(variant),
+        photo: (p.photos && p.photos[0]) || "",
+        price: variant.price,
+        qty
+      };
     } else {
-      delete cart[key];
+      delete cart[variant.id];
     }
 
     localStorage.setItem("cart", JSON.stringify(cart));
     document.dispatchEvent(new Event("cart:updated"));
-    updateCatalogPrice(id);
     refreshProceedButton();
   }
 
   function restoreCart() {
-    Object.entries(cart).forEach(([key, c]) => {
-      const el = document.getElementById(`qty_${c.product.id}_${c.size}`);
-      if (el) el.value = c.qty;
-      updateCatalogPrice(c.product.id);
-    });
     document.dispatchEvent(new Event("cart:updated"));
     refreshProceedButton();
-  }
-
-  function updateCatalogPrice(id) {
-    const p = productMap[id];
-    let total = 0;
-    Object.keys(p.sizes).forEach(s => {
-      const key = `${id}-${s}`;
-      if (cart[key]) total += cart[key].qty * cart[key].price;
-    });
-    const priceEl = document.getElementById(`price_${id}`);
-    if (priceEl) priceEl.textContent = total.toLocaleString("en-IN");
   }
 
   function refreshProceedButton() {
@@ -270,15 +326,16 @@ layout: base.njk
       cartContent.innerHTML = `<div class="empty-state"><div class="empty-icon"><i class="bi bi-cart"></i></div><p>Your cart is empty.</p></div>`;
     } else {
       let grandTotal = 0;
-      cartContent.innerHTML = Object.entries(cart).map(([key, c]) => {
+      cartContent.innerHTML = Object.entries(cart).map(([variantId, c]) => {
         grandTotal += c.price * c.qty;
+        const label = c.valuesLabel ? ` (${c.valuesLabel})` : "";
         return `
           <div class="d-flex justify-content-between align-items-center py-2" style="border-bottom:1px solid var(--color-border);">
             <div>
-              <div style="font-weight:600; font-size:14px;">${c.product.name}</div>
-              <div style="font-size:12px; color:var(--color-text-muted);">${c.size} · Qty ${c.qty} · ₹${c.price * c.qty}</div>
+              <div style="font-weight:600; font-size:14px;">${c.name}${label}</div>
+              <div style="font-size:12px; color:var(--color-text-muted);">Qty ${c.qty} · ₹${c.price * c.qty}</div>
             </div>
-            <button class="btn btn-secondary btn-sm" onclick="deleteItem('${key}')"><i class="bi bi-trash"></i></button>
+            <button class="btn btn-secondary btn-sm" onclick="deleteItem('${variantId}')"><i class="bi bi-trash"></i></button>
           </div>`;
       }).join("") + `
         <div class="d-flex justify-content-between align-items-center pt-3">
@@ -292,11 +349,15 @@ layout: base.njk
     cartModalInstance.show();
   }
 
-  function deleteItem(key) {
-    const [id, size] = key.split("-");
-    const el = document.getElementById(`qty_${id}_${size}`);
-    if (el) el.value = 0;
-    updateCart(Number(id), size);
+  function deleteItem(variantId) {
+    delete cart[variantId];
+    localStorage.setItem("cart", JSON.stringify(cart));
+    document.dispatchEvent(new Event("cart:updated"));
+    refreshProceedButton();
+    // Refresh whichever product card this variant belongs to, if visible
+    filteredProducts.forEach(p => {
+      if (p.variants.some(v => String(v.id) === String(variantId))) refreshVariantDisplay(p.id);
+    });
     openCartModal();
   }
 
@@ -334,8 +395,8 @@ layout: base.njk
       const matchesCategory = activeCategory === "All" || (p.categories && p.categories.includes(activeCategory));
       const matchesSearch = !query ||
         p.name.toLowerCase().includes(query) ||
-        Object.keys(p.sizes).some(s => s.toLowerCase().includes(query)) ||
-        Object.values(p.sizes).some(price => price.toString().includes(query));
+        (p.variants || []).some(v => Object.values(v.values).some(val => val.toLowerCase().includes(query))) ||
+        (p.variants || []).some(v => v.price.toString().includes(query));
       return matchesCategory && matchesSearch;
     });
 
@@ -347,7 +408,7 @@ layout: base.njk
   }
 
   function getMinPrice(product) {
-    return Math.min(...Object.values(product.sizes));
+    return Math.min(...(product.variants || []).map(v => v.price));
   }
 
   loadCatalog();

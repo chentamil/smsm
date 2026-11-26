@@ -22,7 +22,7 @@ export async function onRequestPost(context) {
     const items = JSON.parse(order.items_json);
 
     const itemsHtml = items.map(i =>
-      `<li>${i.name} (${i.size}) x ${i.qty} - ₹${i.price * i.qty}</li>`
+      `<li>${i.name}${i.size ? " (" + i.size + ")" : ""} x ${i.qty} - ₹${i.price * i.qty}</li>`
     ).join("");
 
     const gstLine = order.gst_amount > 0 ? `<p>GST: ₹${order.gst_amount}</p>` : "";
@@ -46,7 +46,7 @@ export async function onRequestPost(context) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "Invoices <onboarding@resend.dev>",
+        from: "Invoices <info@achabazar.com>",
         to: [customer.email],
         subject: `Invoice for Order #${order.order_id}`,
         html

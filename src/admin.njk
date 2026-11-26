@@ -42,6 +42,16 @@ layout: admin-base.njk
     <div id="category-list" class="d-flex flex-wrap gap-2"></div>
   </div>
 
+  <h2 style="margin-top: var(--space-5);">Attributes</h2>
+  <div class="surface-card">
+    <p style="font-size:13px; color:var(--color-text-muted);">Define reusable attributes like Color or Size, then pick which ones apply when adding a product below.</p>
+    <div class="d-flex gap-2 mb-3">
+      <input type="text" class="form-control" id="new-attribute-name" placeholder="New attribute name, e.g. Color">
+      <button class="btn btn-primary" type="button" onclick="addAttribute()">Add Attribute</button>
+    </div>
+    <div id="attribute-list" class="stack-md"></div>
+  </div>
+
   <h2 style="margin-top: var(--space-5);">Add Product</h2>
   <form id="add-form" class="surface-card">
     <div class="form-field">
@@ -64,25 +74,30 @@ layout: admin-base.njk
       <label class="form-label">Categories</label>
       <div id="p-category-checkboxes" class="d-flex flex-wrap gap-2"></div>
     </div>
-    <div class="row g-2">
-      <div class="col-6 form-field">
-        <label class="form-label" for="p-stock">Stock quantity</label>
-        <input type="number" class="form-control" id="p-stock" min="0" value="0">
-      </div>
-      <div class="col-6 form-field">
-        <label class="form-label" for="p-gst">GST %</label>
-        <input type="number" class="form-control" id="p-gst" min="0" max="28" step="0.1" value="0">
-      </div>
-    </div>
     <div class="form-field">
-      <label class="form-label" for="p-sizes">Sizes (JSON)</label>
-      <input type="text" class="form-control" id="p-sizes" placeholder='{"S":100,"M":120}' required>
+      <label class="form-label" for="p-gst">GST %</label>
+      <input type="number" class="form-control" id="p-gst" min="0" max="28" step="0.1" value="0" style="max-width:160px;">
     </div>
+
+    <div class="form-field">
+      <label class="form-label">Attributes (optional - leave all unchecked for a simple product with just one price)</label>
+      <div id="p-attribute-picker"></div>
+    </div>
+
+    <div class="form-field">
+      <label class="form-label">Price &amp; Stock</label>
+      <div id="p-variant-table"></div>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-block">Add Product</button>
   </form>
   <div id="add-result" style="margin-top: var(--space-2);"></div>
 
   <h2 style="margin-top: var(--space-5);">Products</h2>
+  <div class="surface-card" style="margin-bottom: var(--space-3);">
+    <label class="form-label">Filter by category</label>
+    <div id="products-category-filter" class="d-flex flex-wrap gap-2"></div>
+  </div>
   <div class="bulk-actions-bar" id="products-bulk-bar">
     <span id="products-selected-count">0 selected</span>
     <button class="btn btn-danger btn-sm" onclick="deleteSelectedProducts()"><i class="bi bi-trash"></i> Delete Selected</button>
@@ -234,19 +249,17 @@ layout: admin-base.njk
           <label class="form-label">Categories</label>
           <div id="edit-p-category-checkboxes" class="d-flex flex-wrap gap-2"></div>
         </div>
-        <div class="row g-2">
-          <div class="col-6 form-field">
-            <label class="form-label" for="edit-p-stock">Stock quantity</label>
-            <input type="number" class="form-control" id="edit-p-stock" min="0">
-          </div>
-          <div class="col-6 form-field">
-            <label class="form-label" for="edit-p-gst">GST %</label>
-            <input type="number" class="form-control" id="edit-p-gst" min="0" max="28" step="0.1">
-          </div>
+        <div class="form-field">
+          <label class="form-label" for="edit-p-gst">GST %</label>
+          <input type="number" class="form-control" id="edit-p-gst" min="0" max="28" step="0.1" style="max-width:160px;">
         </div>
         <div class="form-field">
-          <label class="form-label" for="edit-p-sizes">Sizes (JSON)</label>
-          <input type="text" class="form-control" id="edit-p-sizes" placeholder='{"S":100,"M":120}'>
+          <label class="form-label">Attributes</label>
+          <div id="edit-p-attribute-picker"></div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Price &amp; Stock</label>
+          <div id="edit-p-variant-table"></div>
         </div>
         <div id="edit-p-result"></div>
       </div>
@@ -334,6 +347,7 @@ layout: admin-base.njk
     allCategories = await res.json();
     renderCategoryList();
     renderCategoryCheckboxes("p-category-checkboxes", []);
+    renderProductsCategoryFilter();
   }
 
   function renderCategoryList() {
@@ -394,6 +408,241 @@ layout: admin-base.njk
     return [...document.querySelectorAll(`#${containerId} .category-checkbox:checked`)].map(cb => Number(cb.value));
   }
 
+  // ---- Category filter for the products table (multi-select, OR logic) ----
+  let productsCategoryFilter = [];
+
+  function renderProductsCategoryFilter() {
+    const el = document.getElementById("products-category-filter");
+    if (!Array.isArray(allCategories) || allCategories.length === 0) {
+      el.innerHTML = `<span style="font-size:13px; color:var(--color-text-muted);">No categories yet.</span>`;
+      return;
+    }
+    el.innerHTML = allCategories.map(c => `
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; background:var(--color-surface-sunken); padding:6px 10px; border-radius: var(--radius-sm); cursor:pointer;">
+        <input type="checkbox" class="products-filter-checkbox" value="${c.id}" ${productsCategoryFilter.includes(c.id) ? "checked" : ""} onchange="onProductsCategoryFilterChange()">
+        ${c.name}
+      </label>
+    `).join("");
+  }
+
+  function onProductsCategoryFilterChange() {
+    productsCategoryFilter = [...document.querySelectorAll(".products-filter-checkbox:checked")].map(cb => Number(cb.value));
+    productsPage = 1;
+    renderProductsTable();
+  }
+
+  // ---- Attributes (e.g. Color: Red, Green) ----
+  let allAttributes = [];
+
+  async function loadAttributes() {
+    const res = await fetch("/api/admin/attributes");
+    allAttributes = await res.json();
+    renderAttributeList();
+    renderAttributePicker("p-attribute-picker", {});
+  }
+
+  function renderAttributeList() {
+    const el = document.getElementById("attribute-list");
+    if (!Array.isArray(allAttributes) || allAttributes.length === 0) {
+      el.innerHTML = `<span style="font-size:13px; color:var(--color-text-muted);">No attributes yet - add one above (e.g. Color, Size).</span>`;
+      return;
+    }
+    el.innerHTML = allAttributes.map(a => `
+      <div class="surface-card" style="padding: var(--space-3);">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <strong>${a.name}</strong>
+          <button class="btn btn-danger btn-sm" onclick="deleteAttribute(${a.id})"><i class="bi bi-trash"></i></button>
+        </div>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          ${a.values.map(v => `
+            <span class="badge badge-neutral" style="display:inline-flex; align-items:center; gap:6px; padding:8px 12px;">
+              ${v.value}
+              <button onclick="deleteAttributeValue(${v.id})" style="border:none; background:none; color:var(--color-danger); cursor:pointer; font-size:14px; line-height:1;">&times;</button>
+            </span>
+          `).join("") || `<span style="font-size:12px; color:var(--color-text-muted);">No values yet</span>`}
+        </div>
+        <div class="d-flex gap-2">
+          <input type="text" class="form-control form-control-sm" id="new-value-${a.id}" placeholder="New value, e.g. Red">
+          <button class="btn btn-secondary btn-sm" onclick="addAttributeValue(${a.id})">Add Value</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function addAttribute() {
+    const input = document.getElementById("new-attribute-name");
+    const name = input.value.trim();
+    if (!name) return;
+    await fetch("/api/admin/attributes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name })
+    });
+    input.value = "";
+    await loadAttributes();
+  }
+
+  async function deleteAttribute(id) {
+    if (!confirm("Delete this attribute and all its values? Products using it will need their variants rebuilt.")) return;
+    await fetch("/api/admin/attributes", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    await loadAttributes();
+  }
+
+  async function addAttributeValue(attributeId) {
+    const input = document.getElementById(`new-value-${attributeId}`);
+    const value = input.value.trim();
+    if (!value) return;
+    await fetch("/api/admin/attribute-values", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ attributeId, value })
+    });
+    await loadAttributes();
+  }
+
+  async function deleteAttributeValue(id) {
+    if (!confirm("Remove this value?")) return;
+    await fetch("/api/admin/attribute-values", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id })
+    });
+    await loadAttributes();
+  }
+
+  // ---- Variant builder (shared between Add Product and Edit Product) ----
+  // Ticking any value under an attribute means that attribute is "in use"
+  // for this product - no separate on/off toggle needed.
+
+  function renderAttributePicker(pickerContainerId, selectedValueIds) {
+    const el = document.getElementById(pickerContainerId);
+    if (!el) return;
+    const tableId = pickerContainerId.replace("attribute-picker", "variant-table");
+
+    if (!Array.isArray(allAttributes) || allAttributes.length === 0) {
+      el.innerHTML = `<span style="font-size:13px; color:var(--color-text-muted);">No attributes defined yet - add one in Attributes above if you want Color/Size options. Otherwise this will be a simple product with one price.</span>`;
+      regenerateVariantTable(pickerContainerId, tableId);
+      return;
+    }
+
+    el.innerHTML = allAttributes.map(a => `
+      <div style="margin-bottom: var(--space-2);">
+        <div style="font-size:13px; font-weight:600; margin-bottom:4px;">${a.name}</div>
+        <div class="d-flex flex-wrap gap-2">
+          ${a.values.map(v => `
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; background:var(--color-surface-sunken); padding:6px 10px; border-radius: var(--radius-sm); cursor:pointer;">
+              <input type="checkbox" class="attr-value-checkbox" data-attr-name="${a.name}" data-value="${v.value}"
+                     ${selectedValueIds.includes(v.id) ? "checked" : ""}
+                     onchange="regenerateVariantTable('${pickerContainerId}','${tableId}')">
+              ${v.value}
+            </label>
+          `).join("") || `<span style="font-size:12px; color:var(--color-text-muted);">No values yet for this attribute</span>`}
+        </div>
+      </div>
+    `).join("");
+
+    regenerateVariantTable(pickerContainerId, tableId);
+  }
+
+  // Keeps previously entered price/stock when checkboxes change, keyed by
+  // the exact combination so nothing already typed in gets lost.
+  let variantDataByTable = {};
+
+  function regenerateVariantTable(pickerContainerId, tableId) {
+    // Preserve whatever is currently in the table before rebuilding it
+    if (!variantDataByTable[tableId]) variantDataByTable[tableId] = {};
+    const existingMap = variantDataByTable[tableId];
+    document.querySelectorAll(`#${tableId} .variant-price`).forEach(input => {
+      const key = input.dataset.combo;
+      if (!existingMap[key]) existingMap[key] = {};
+      existingMap[key].price = input.value;
+    });
+    document.querySelectorAll(`#${tableId} .variant-stock`).forEach(input => {
+      const key = input.dataset.combo;
+      if (!existingMap[key]) existingMap[key] = {};
+      existingMap[key].stock = input.value;
+    });
+
+    // Group currently checked values by attribute name
+    const checked = [...document.querySelectorAll(`#${pickerContainerId} .attr-value-checkbox:checked`)];
+    const valuesByAttr = {};
+    checked.forEach(cb => {
+      const attrName = cb.dataset.attrName;
+      if (!valuesByAttr[attrName]) valuesByAttr[attrName] = [];
+      valuesByAttr[attrName].push(cb.dataset.value);
+    });
+
+    const combos = cartesianProduct(valuesByAttr);
+    renderVariantTable(tableId, combos, existingMap);
+  }
+
+  function cartesianProduct(valuesByAttr) {
+    const attrNames = Object.keys(valuesByAttr);
+    if (attrNames.length === 0) return [{}]; // simple product - one variant, no attributes
+
+    let combos = [{}];
+    attrNames.forEach(name => {
+      const next = [];
+      valuesByAttr[name].forEach(val => {
+        combos.forEach(combo => next.push({ ...combo, [name]: val }));
+      });
+      combos = next;
+    });
+    return combos;
+  }
+
+  function sortedComboKey(combo) {
+    const sorted = {};
+    Object.keys(combo).sort().forEach(k => sorted[k] = combo[k]);
+    return JSON.stringify(sorted);
+  }
+
+  function renderVariantTable(tableId, combos, existingMap) {
+    const el = document.getElementById(tableId);
+    if (!el) return;
+
+    const attrNames = combos.length > 0 ? Object.keys(combos[0]) : [];
+
+    el.innerHTML = `
+      <table class="table-app">
+        <thead><tr>
+          ${attrNames.map(n => `<th>${n}</th>`).join("")}
+          <th>Price</th><th>Stock</th>
+        </tr></thead>
+        <tbody>
+          ${combos.map(combo => {
+            const key = sortedComboKey(combo);
+            const existing = existingMap[key] || {};
+            return `
+              <tr>
+                ${attrNames.map(n => `<td data-label="${n}">${combo[n]}</td>`).join("")}
+                <td data-label="Price"><input type="number" class="form-control form-control-sm variant-price" data-combo='${key.replace(/'/g, "&#39;")}' value="${existing.price ?? 0}" min="0"></td>
+                <td data-label="Stock"><input type="number" class="form-control form-control-sm variant-stock" data-combo='${key.replace(/'/g, "&#39;")}' value="${existing.stock ?? 0}" min="0"></td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  function collectVariants(tableId) {
+    const priceInputs = [...document.querySelectorAll(`#${tableId} .variant-price`)];
+    return priceInputs.map(priceInput => {
+      const key = priceInput.dataset.combo;
+      const stockInput = priceInput.closest("tr").querySelector(".variant-stock");
+      return {
+        values: JSON.parse(key),
+        price: Number(priceInput.value) || 0,
+        stock: Number(stockInput ? stockInput.value : 0) || 0
+      };
+    });
+  }
+
   // ---- Products ----
   let productsPage = 1;
 
@@ -404,47 +653,64 @@ layout: admin-base.njk
     renderProductsTable();
   }
 
+  function getFilteredProducts() {
+    if (productsCategoryFilter.length === 0) return allProducts;
+    return allProducts.filter(p =>
+      (p.categories || []).some(c => productsCategoryFilter.includes(c.id))
+    );
+  }
+
   function renderProductsTable() {
     const el = document.getElementById("product-list");
+    const filtered = getFilteredProducts();
 
-    if (!Array.isArray(allProducts) || allProducts.length === 0) {
-      el.innerHTML = `<div class="empty-state"><i class="bi bi-box-seam empty-icon"></i><p>No products yet.</p></div>`;
+    if (!Array.isArray(filtered) || filtered.length === 0) {
+      el.innerHTML = `<div class="empty-state"><i class="bi bi-box-seam empty-icon"></i><p>No products match.</p></div>`;
       document.getElementById("products-pagination").innerHTML = "";
       return;
     }
 
-    const totalPages = Math.max(1, Math.ceil(allProducts.length / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     if (productsPage > totalPages) productsPage = totalPages;
     const start = (productsPage - 1) * PAGE_SIZE;
-    const pageItems = allProducts.slice(start, start + PAGE_SIZE);
+    const pageItems = filtered.slice(start, start + PAGE_SIZE);
 
     el.innerHTML = `
       <table class="table-app">
         <thead><tr>
           <th><input type="checkbox" class="select-checkbox" onchange="toggleAllProducts(this.checked)"></th>
-          <th>Image</th><th>Name</th><th>Categories</th><th>Stock</th><th>GST%</th><th>Sizes</th><th>Actions</th>
+          <th>Image</th><th>Name</th><th>Categories</th><th>Price</th><th>Stock</th><th>GST%</th><th>Variants</th><th>Actions</th>
         </tr></thead>
         <tbody>
-          ${pageItems.map(p => `
-            <tr>
-              <td data-label="Select"><input type="checkbox" class="select-checkbox product-checkbox" value="${p.id}" onchange="updateProductsBulkBar()"></td>
-              <td data-label="Image"><img class="product-thumb" src="${(p.photos && p.photos[0]) || ''}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=No+Image'"></td>
-              <td data-label="Name">${p.name}</td>
-              <td data-label="Categories">${(p.categories || []).map(c => c.name).join(", ") || "-"}</td>
-              <td data-label="Stock">${p.stock ?? 0}</td>
-              <td data-label="GST%">${p.gstPercent ?? 0}</td>
-              <td data-label="Sizes">${JSON.stringify(p.sizes)}</td>
-              <td data-label="Actions">
-                <button class="btn btn-secondary btn-sm" onclick="openEditProduct(${p.id})"><i class="bi bi-pencil"></i></button>
-                <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
-              </td>
-            </tr>
-          `).join("")}
+          ${pageItems.map(p => {
+            const variants = p.variants || [];
+            const prices = variants.map(v => v.price);
+            const priceDisplay = prices.length === 0 ? "-" :
+              (Math.min(...prices) === Math.max(...prices) ? `₹${prices[0]}` : `₹${Math.min(...prices)} - ₹${Math.max(...prices)}`);
+            const totalStock = variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+
+            return `
+              <tr>
+                <td data-label="Select"><input type="checkbox" class="select-checkbox product-checkbox" value="${p.id}" onchange="updateProductsBulkBar()"></td>
+                <td data-label="Image"><img class="product-thumb" src="${(p.photos && p.photos[0]) || ''}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=No+Image'"></td>
+                <td data-label="Name">${p.name}</td>
+                <td data-label="Categories">${(p.categories || []).map(c => c.name).join(", ") || "-"}</td>
+                <td data-label="Price">${priceDisplay}</td>
+                <td data-label="Stock">${totalStock}</td>
+                <td data-label="GST%">${p.gstPercent ?? 0}</td>
+                <td data-label="Variants">${variants.length}</td>
+                <td data-label="Actions">
+                  <button class="btn btn-secondary btn-sm" onclick="openEditProduct(${p.id})"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-danger btn-sm" onclick="deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
+                </td>
+              </tr>
+            `;
+          }).join("")}
         </tbody>
       </table>
     `;
     updateProductsBulkBar();
-    renderPagination("products-pagination", allProducts.length, productsPage, (p) => { productsPage = p; renderProductsTable(); });
+    renderPagination("products-pagination", filtered.length, productsPage, (p) => { productsPage = p; renderProductsTable(); });
   }
 
   function toggleAllProducts(checked) {
@@ -481,24 +747,46 @@ layout: admin-base.njk
     document.getElementById("edit-p-photo1").value = photos[0] || "";
     document.getElementById("edit-p-photo2").value = photos[1] || "";
     document.getElementById("edit-p-photo3").value = photos[2] || "";
-    document.getElementById("edit-p-stock").value = p.stock ?? 0;
     document.getElementById("edit-p-gst").value = p.gstPercent ?? 0;
-    document.getElementById("edit-p-sizes").value = JSON.stringify(p.sizes);
     document.getElementById("edit-p-result").innerHTML = "";
     renderCategoryCheckboxes("edit-p-category-checkboxes", (p.categories || []).map(c => c.id));
+
+    // Seed the variant table's memory with this product's actual saved
+    // price/stock, keyed by combination, so regenerating the table (which
+    // renderAttributePicker triggers) shows the real values, not zeros.
+    variantDataByTable["edit-p-variant-table"] = {};
+    (p.variants || []).forEach(v => {
+      variantDataByTable["edit-p-variant-table"][sortedComboKey(v.values)] = { price: v.price, stock: v.stock };
+    });
+
+    renderAttributePicker("edit-p-attribute-picker", getValueIdsUsedByProduct(p));
 
     const modalEl = document.getElementById("editProductModal");
     if (!editProductModalInstance) editProductModalInstance = new bootstrap.Modal(modalEl);
     editProductModalInstance.show();
   }
 
+  // Maps a product's variant values (e.g. {"Color":"Red"}) back to the
+  // underlying attribute_value ids, so the right checkboxes start checked.
+  function getValueIdsUsedByProduct(p) {
+    const ids = [];
+    (p.variants || []).forEach(v => {
+      Object.entries(v.values).forEach(([attrName, val]) => {
+        const attr = allAttributes.find(a => a.name === attrName);
+        if (!attr) return;
+        const valObj = attr.values.find(x => x.value === val);
+        if (valObj) ids.push(valObj.id);
+      });
+    });
+    return ids;
+  }
+
   async function saveProductEdit() {
     const resultEl = document.getElementById("edit-p-result");
-    let sizes;
-    try {
-      sizes = JSON.parse(document.getElementById("edit-p-sizes").value);
-    } catch {
-      resultEl.innerHTML = `<div class="alert alert-danger">Sizes must be valid JSON.</div>`;
+    const variants = collectVariants("edit-p-variant-table");
+
+    if (variants.length === 0) {
+      resultEl.innerHTML = `<div class="alert alert-danger">At least one price/stock row is required.</div>`;
       return;
     }
 
@@ -515,8 +803,7 @@ layout: admin-base.njk
         id: Number(document.getElementById("edit-p-id").value),
         name: document.getElementById("edit-p-name").value,
         photos,
-        sizes,
-        stock: Number(document.getElementById("edit-p-stock").value) || 0,
+        variants,
         gstPercent: Number(document.getElementById("edit-p-gst").value) || 0,
         categoryIds: getSelectedCategoryIds("edit-p-category-checkboxes")
       })
@@ -557,11 +844,9 @@ layout: admin-base.njk
     e.preventDefault();
     const resultEl = document.getElementById("add-result");
 
-    let sizes;
-    try {
-      sizes = JSON.parse(document.getElementById("p-sizes").value);
-    } catch {
-      resultEl.innerHTML = `<div class="alert alert-danger">Sizes must be valid JSON, e.g. {"S":100,"M":120}</div>`;
+    const variants = collectVariants("p-variant-table");
+    if (variants.length === 0) {
+      resultEl.innerHTML = `<div class="alert alert-danger">At least one price/stock row is required.</div>`;
       return;
     }
 
@@ -577,8 +862,7 @@ layout: admin-base.njk
       body: JSON.stringify({
         name: document.getElementById("p-name").value,
         photos,
-        sizes,
-        stock: Number(document.getElementById("p-stock").value) || 0,
+        variants,
         gstPercent: Number(document.getElementById("p-gst").value) || 0,
         categoryIds: getSelectedCategoryIds("p-category-checkboxes")
       })
@@ -589,6 +873,8 @@ layout: admin-base.njk
       resultEl.innerHTML = `<div class="alert alert-success">Product added.</div>`;
       document.getElementById("add-form").reset();
       renderCategoryCheckboxes("p-category-checkboxes", []);
+      variantDataByTable["p-variant-table"] = {};
+      renderAttributePicker("p-attribute-picker", []);
       loadProducts();
     } else {
       resultEl.innerHTML = `<div class="alert alert-danger">${data.error || "unknown error"}</div>`;
@@ -806,7 +1092,7 @@ layout: admin-base.njk
     const o = allOrders.find(x => x.order_id === orderId);
     if (!o) return;
 
-    const itemsSummary = o.items.map(i => `${i.name} (${i.size}) x${i.qty}`).join(", ");
+    const itemsSummary = o.items.map(i => `${i.name}${i.size ? " (" + i.size + ")" : ""} x${i.qty}`).join(", ");
     const message = `Hi ${o.customer.name}, this is a reminder for your order #${orderId} - ${itemsSummary}. Total: ₹${o.amount}. Status: ${o.status}. Please complete payment at your earliest convenience. Thank you!`;
 
     const phone = (o.customer.phone || "").replace(/\D/g, "");
@@ -876,6 +1162,7 @@ layout: admin-base.njk
   });
 
   loadCategories();
+  loadAttributes();
   loadProducts();
   loadOrders();
   loadSettings();

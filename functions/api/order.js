@@ -50,16 +50,21 @@ export async function onRequestPost(context) {
     for (const item of items) {
       let unitPrice = Number(item.price) || 0;
       let gstPercent = 0;
+      let productId = null;
 
-      if (item.productId) {
-        const product = await env.DB.prepare(
-          "SELECT sizes_json, gst_percent FROM products WHERE id = ? AND tenant_id = ?"
-        ).bind(item.productId, tenantId).first();
+      if (item.variantId) {
+        const variant = await env.DB.prepare(
+          "SELECT product_id, price FROM product_variants WHERE id = ?"
+        ).bind(item.variantId).first();
 
-        if (product) {
-          const sizes = JSON.parse(product.sizes_json);
-          if (sizes[item.size] !== undefined) unitPrice = sizes[item.size];
-          gstPercent = product.gst_percent || 0;
+        if (variant) {
+          unitPrice = variant.price;
+          productId = variant.product_id;
+
+          const product = await env.DB.prepare(
+            "SELECT gst_percent FROM products WHERE id = ? AND tenant_id = ?"
+          ).bind(productId, tenantId).first();
+          if (product) gstPercent = product.gst_percent || 0;
         }
       }
 
@@ -70,9 +75,10 @@ export async function onRequestPost(context) {
       gstAmount += lineGst;
 
       resolvedItems.push({
-        productId: item.productId || null,
+        variantId: item.variantId || null,
+        productId,
         name: item.name,
-        size: item.size,
+        size: item.valuesLabel || item.size || "",
         price: unitPrice,
         qty: item.qty,
         gstPercent,
@@ -147,7 +153,7 @@ function validateOrder(customer, items) {
 
 async function sendOrderEmail(apiKey, customer, orderId, items, subtotal, gstAmount, amount) {
   const itemsHtml = items.map(i =>
-    `<li>${i.name} (${i.size}) x ${i.qty} - ₹${i.price * i.qty}</li>`
+    `<li>${i.name}${i.size ? " (" + i.size + ")" : ""} x ${i.qty} - ₹${i.price * i.qty}</li>`
   ).join("");
 
   const gstLine = gstAmount > 0 ? `<p>GST: ₹${gstAmount}</p>` : "";
