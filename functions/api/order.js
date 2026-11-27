@@ -100,7 +100,7 @@ export async function onRequestPost(context) {
 
     if (env.RESEND_API_KEY) {
       try {
-        await sendOrderEmail(env.RESEND_API_KEY, customer, orderId, resolvedItems, subtotal, gstAmount, amount);
+        await sendOrderEmail(env.RESEND_API_KEY, env.FROM_EMAIL, customer, orderId, resolvedItems, subtotal, gstAmount, amount);
       } catch (emailErr) {
         console.error("Email send failed:", emailErr.message);
       }
@@ -151,7 +151,7 @@ function validateOrder(customer, items) {
   return errors;
 }
 
-async function sendOrderEmail(apiKey, customer, orderId, items, subtotal, gstAmount, amount) {
+async function sendOrderEmail(apiKey, fromEmail, customer, orderId, items, subtotal, gstAmount, amount) {
   const itemsHtml = items.map(i =>
     `<li>${i.name}${i.size ? " (" + i.size + ")" : ""} x ${i.qty} - ₹${i.price * i.qty}</li>`
   ).join("");
@@ -175,7 +175,7 @@ async function sendOrderEmail(apiKey, customer, orderId, items, subtotal, gstAmo
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      from: "Orders <onboarding@resend.dev>",
+      from: fromEmail || "Orders <onboarding@resend.dev>",
       to: [customer.email],
       subject: `Order Confirmation #${orderId}`,
       html

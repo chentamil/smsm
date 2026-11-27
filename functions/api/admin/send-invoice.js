@@ -46,7 +46,7 @@ export async function onRequestPost(context) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        from: "Invoices <info@achabazar.com>",
+        from: env.FROM_EMAIL || "Invoices <onboarding@resend.dev>",
         to: [customer.email],
         subject: `Invoice for Order #${order.order_id}`,
         html

@@ -4,6 +4,7 @@
   "supportEmail": "support@example.com",
   "supportPhone": "+91 90000 00000",
   "footerNote": "Cash on delivery available on all orders.",
+  "turnstileSiteKey": "0x4AAAAAAD8QTWA3w68uFiB1",
   "upiId": "yourshop@upi",
   "upiPayeeName": "SMSM Store",
   "nav": [

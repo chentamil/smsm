@@ -438,7 +438,7 @@ layout: admin-base.njk
     const res = await fetch("/api/admin/attributes");
     allAttributes = await res.json();
     renderAttributeList();
-    renderAttributePicker("p-attribute-picker", {});
+    renderAttributePicker("p-attribute-picker", []);
   }
 
   function renderAttributeList() {

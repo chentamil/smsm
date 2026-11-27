@@ -55,8 +55,7 @@ layout: base.njk
   <input type="text" id="website" name="website" autocomplete="off" tabindex="-1"
          style="position:absolute; left:-9999px; width:1px; height:1px;" aria-hidden="true">
 
-  <!-- 🔧 REPLACE "YOUR_TURNSTILE_SITE_KEY" below with your real site key -->
-  <div class="cf-turnstile" data-sitekey="0x4AAAAAAD8QTWA3w68uFiB1" style="margin: var(--space-3) 0;"></div>
+  <div class="cf-turnstile" data-sitekey="{{ site.turnstileSiteKey }}" style="margin: var(--space-3) 0;"></div>
 
   <button type="submit" class="btn btn-primary btn-block" id="placeOrderBtn">Place Order (Cash on Delivery)</button>
 </form>
@@ -74,6 +73,8 @@ layout: base.njk
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     box-shadow: var(--shadow-sm);
   }
   .cart-row .cart-row-name { font-weight: 600; font-size: 14px; }
@@ -146,11 +147,19 @@ layout: base.njk
       const c = cart[key];
       return `
         <div class="cart-row">
-          <div>
+          <div style="min-width:0;">
             <div class="cart-row-name">${c.name}${c.valuesLabel ? " (" + c.valuesLabel + ")" : ""}</div>
-            <div class="cart-row-meta">Qty ${c.qty} · ₹${c.price * c.qty}</div>
+            <div class="cart-row-meta">₹${c.price} each · Line total ₹${c.price * c.qty}</div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="removeItem('${key}')"><i class="bi bi-trash"></i></button>
+          <div class="d-flex align-items-center gap-2">
+            <div class="qty-stepper">
+              <button class="btn btn-outline-primary" type="button" onclick="changeCartQty('${key}', -1)" aria-label="Decrease quantity">−</button>
+              <input type="number" class="form-control qty-input" value="${c.qty}" min="0" max="100"
+                     onchange="setCartQty('${key}', this.value)" aria-label="Quantity">
+              <button class="btn btn-outline-primary" type="button" onclick="changeCartQty('${key}', 1)" aria-label="Increase quantity">+</button>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="removeItem('${key}')" aria-label="Remove item"><i class="bi bi-trash"></i></button>
+          </div>
         </div>`;
     }).join("");
 
@@ -164,6 +173,27 @@ layout: base.njk
     } else {
       gstRow.style.display = "none";
     }
+  }
+
+  // Quantity edits: setting 0 removes the line; capped at 100 (the server limit)
+  function setCartQty(key, value) {
+    const cart = getCart();
+    if (!cart[key]) return;
+    let qty = Math.floor(Number(value)) || 0;
+    if (qty > 100) qty = 100;
+    if (qty <= 0) {
+      delete cart[key];
+    } else {
+      cart[key].qty = qty;
+    }
+    saveCart(cart);
+    renderCart();
+  }
+
+  function changeCartQty(key, delta) {
+    const cart = getCart();
+    if (!cart[key]) return;
+    setCartQty(key, cart[key].qty + delta);
   }
 
   function removeItem(key) {
